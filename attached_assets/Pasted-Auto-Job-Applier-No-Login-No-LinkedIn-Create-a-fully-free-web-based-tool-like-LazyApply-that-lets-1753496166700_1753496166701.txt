@@ -1,0 +1,78 @@
+Auto Job Applier (No Login, No LinkedIn)
+Create a fully free web-based tool like LazyApply that lets users input job links from company websites (e.g., Greenhouse, Lever, Workday, etc.), and then automatically applies to those jobs by visiting the site, filling out the form with user-provided info (resume, name, email, etc.), and submitting it — all without login, without LinkedIn, and with a simple clean UI.
+
+🧠 Core Functionalities:
+1. 🔗 Paste Job Link & Auto-Detect Platform
+User pastes job link (e.g., https://boards.greenhouse.io/companyX/jobs/12345)
+
+The tool detects platform type (Greenhouse, Lever, Workday, etc.)
+
+2. ✍️ Auto Form Filling via Headless Browser
+Use Playwright (recommended) or Puppeteer in backend
+
+Automatically:
+
+Open the job link
+
+Find form fields: name, email, phone, resume upload, etc.
+
+Fill using user's stored data
+
+Upload files (resume & optional cover letter)
+
+Submit application
+
+3. ⚙️ Profile Setup (No Login Needed)
+Local-only form on frontend to let user enter:
+
+Name
+
+Email
+
+Phone number
+
+Resume file upload
+
+Cover letter (optional)
+
+Store all profile data in localStorage only (no DB or auth)
+
+4. 🧾 Application Logger (Local History)
+Keep a list of previously applied jobs (with timestamps & statuses)
+
+Store in localStorage
+
+Show status: ✅ Applied, ❌ Failed, or ⚠️ Needs Review
+
+5. 🖼️ Simple UI with Drag-and-Drop Feel
+Clean homepage:
+
+"Paste job link" input
+
+User info section
+
+Upload resume/cover letter
+
+"Apply Now" button
+
+Application history panel below
+
+Use Tailwind CSS + Framer Motion for a modern feel
+
+🚫 What to Exclude:
+❌ No LinkedIn automation
+
+❌ No sign-up / login / user auth
+
+❌ No third-party resume parsing
+
+❌ No backend database — keep everything local unless required
+
+🛠️ Tech Stack
+Feature	Technology Used
+Frontend UI	React or Next.js + Tailwind CSS
+Browser Automation	Playwright with Node.js
+File Upload	input type="file" + localStorage blob
+Resume/CoverLetter	Upload in form + attach to automation
+State Mgmt	localStorage or React context (no backend)
+Deployment	Replit (ideal for small-scale tool)
