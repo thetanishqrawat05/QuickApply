@@ -120,10 +120,8 @@ export class EnhancedAutomationService {
 
     } catch (error) {
       console.error('Enhanced automation error:', error);
-      return {
-        success: false,
-        message: `Failed to start application process: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
+      // Throw the error to allow fallback handling in routes
+      throw error;
     }
   }
 
