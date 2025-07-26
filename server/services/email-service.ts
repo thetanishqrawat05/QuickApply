@@ -30,13 +30,19 @@ export class EmailService {
       // Skip email sending if credentials not configured
       if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
         console.warn('⚠️ Email credentials not configured. Skipping review email. Use manual approval URL:');
-        const approvalUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/approve-application/${session.approvalToken}`;
+        const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+          ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+          : process.env.BASE_URL || 'http://localhost:5000';
+        const approvalUrl = `${baseUrl}/api/approve-application/${session.approvalToken}`;
         console.log(`🔗 Manual approval URL: ${approvalUrl}`);
         return true; // Return true to continue workflow
       }
 
       const profile = session.profileData as ComprehensiveProfile;
-      const approvalUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/approve-application/${session.approvalToken}`;
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+        : process.env.BASE_URL || 'http://localhost:5000';
+      const approvalUrl = `${baseUrl}/api/approve-application/${session.approvalToken}`;
       
       const htmlContent = this.generateReviewEmailHTML(session, profile, filledData, approvalUrl);
       
