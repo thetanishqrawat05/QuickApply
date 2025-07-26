@@ -1,8 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
-import { applyJobRequestSchema, bulkApplyRequestSchema } from "@shared/schema";
+import { applyJobRequestSchema, bulkApplyRequestSchema, insertUserSchema, insertJobApplicationSchema } from "@shared/schema";
 import { AutomationService } from "./services/automation";
+import { storage } from "./storage";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -21,6 +22,61 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const automationService = new AutomationService();
+
+  // User management routes
+  app.post("/api/users", async (req, res) => {
+    try {
+      const validationResult = insertUserSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid user data",
+          errors: validationResult.error.errors
+        });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(validationResult.data.email);
+      if (existingUser) {
+        return res.json(existingUser);
+      }
+
+      const user = await storage.createUser(validationResult.data);
+      res.json(user);
+    } catch (error) {
+      console.error("Create user error:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Get user by email
+  app.get("/api/users/:email", async (req, res) => {
+    try {
+      const user = await storage.getUserByEmail(req.params.email);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error("Get user error:", error);
+      res.status(500).json({ message: "Failed to get user" });
+    }
+  });
+
+  // Get job applications for a user  
+  app.get("/api/users/:userId/applications", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const applications = await storage.getJobApplicationsByUser(userId);
+      res.json(applications);
+    } catch (error) {
+      console.error("Get applications error:", error);
+      res.status(500).json({ message: "Failed to get applications" });
+    }
+  });
 
   // Detect job platform from URL
   app.post("/api/detect-platform", async (req, res) => {
@@ -88,10 +144,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         coverLetterFile
       };
 
-      // Process job application
-      const result = await automationService.applyToJob(applicationData);
-      
-      res.json(result);
+      // Get or create user
+      let user = await storage.getUserByEmail(parsedProfile.email);
+      if (!user) {
+        user = await storage.createUser({
+          name: parsedProfile.name,
+          email: parsedProfile.email,
+          phone: parsedProfile.phone,
+          resumeFileName: resumeFile.originalname,
+          coverLetterFileName: coverLetterFile?.originalname,
+        });
+      }
+
+      // Detect platform
+      const platform = automationService.detectPlatform(jobUrl);
+
+      // Create job application record
+      const jobApplication = await storage.createJobApplication({
+        userId: user.id,
+        jobUrl,
+        platform,
+        status: 'pending',
+        retryCount: 0,
+        submissionConfirmed: false,
+        applicationData: {
+          profile: parsedProfile,
+          resumeFileName: resumeFile.originalname,
+          coverLetterFileName: coverLetterFile?.originalname,
+        },
+      });
+
+      try {
+        // Process job application
+        const result = await automationService.applyToJob(applicationData);
+        
+        // Update application record with result
+        await storage.updateJobApplication(jobApplication.id, {
+          status: result.success ? 'applied' : 'failed',
+          errorMessage: result.success ? undefined : result.message,
+          submissionConfirmed: result.submissionConfirmed || false,
+        });
+
+        res.json({
+          ...result,
+          applicationId: jobApplication.id.toString(),
+        });
+      } catch (error) {
+        // Update application record with error
+        await storage.updateJobApplication(jobApplication.id, {
+          status: 'failed',
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
     } catch (error) {
       console.error("Job application error:", error);
       res.status(500).json({ 

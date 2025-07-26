@@ -15,13 +15,14 @@ Preferred communication style: Simple, everyday language.
 - **Build Tool**: Vite for fast development and optimized builds
 - **UI Library**: Radix UI components with shadcn/ui styling system
 - **Styling**: Tailwind CSS with CSS variables for theming
-- **State Management**: React hooks with localStorage for persistence
+- **State Management**: React hooks with localStorage for persistence + Database integration
 - **Data Fetching**: TanStack Query for server state management
 - **Routing**: Wouter for lightweight client-side routing
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js framework
 - **Language**: TypeScript with ES modules
+- **Database**: PostgreSQL with Drizzle ORM for data persistence
 - **Web Automation**: Playwright for headless browser automation
 - **File Upload**: Multer middleware for handling resume/cover letter uploads
 - **Development**: Hot reload with Vite integration in development mode
@@ -73,11 +74,19 @@ Preferred communication style: Simple, everyday language.
 ### Server-Side Data Flow
 1. Platform detection endpoint analyzes URL patterns
 2. Job application endpoint receives FormData with profile and files
-3. Playwright automation service launches headless browser
-4. Platform-specific handlers perform form filling and submission
-5. Results and status returned to client
+3. User record created/retrieved from PostgreSQL database
+4. Job application record created with pending status
+5. Playwright automation service launches headless browser
+6. Platform-specific handlers perform form filling and submission
+7. Database updated with application results and status
+8. Results and applicationId returned to client
 
-### Local Storage Schema
+### Database Schema
+- **users table**: Stores user profile information (name, email, phone, file names)
+- **job_applications table**: Persistent application history with detailed tracking
+- **Relations**: Users have many job applications
+
+### Local Storage Schema (Legacy/Fallback)
 - `jobApplierProfile`: User profile data (name, email, phone)
 - `resumeFile`: Resume file object
 - `coverLetterFile`: Cover letter file object (optional)
