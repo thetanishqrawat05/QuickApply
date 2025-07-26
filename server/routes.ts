@@ -1,8 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
-import { applyJobRequestSchema, bulkApplyRequestSchema, insertUserSchema, insertJobApplicationSchema } from "@shared/schema";
+import { applyJobRequestSchema, bulkApplyRequestSchema, insertUserSchema, insertJobApplicationSchema, comprehensiveProfileSchema } from "@shared/schema";
 import { AutomationService } from "./services/automation";
+import { EnhancedAutomationService } from "./services/enhanced-automation";
 import { storage } from "./storage";
 
 const upload = multer({
@@ -22,6 +23,7 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const automationService = new AutomationService();
+  const enhancedAutomationService = new EnhancedAutomationService();
 
   // User management routes
   app.post("/api/users", async (req, res) => {
@@ -305,6 +307,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Enhanced job application with email approval workflow
+  app.post("/api/start-application", upload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'coverLetter', maxCount: 1 }
+  ]), async (req, res) => {
+    try {
+      const { jobUrl, profile } = req.body;
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      // Parse profile data
+      let parsedProfile;
+      try {
+        parsedProfile = typeof profile === 'string' ? JSON.parse(profile) : profile;
+      } catch (error) {
+        return res.status(400).json({ message: "Invalid profile data format" });
+      }
+
+      // Validate comprehensive profile
+      const validationResult = comprehensiveProfileSchema.safeParse(parsedProfile);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid profile data",
+          errors: validationResult.error.errors
+        });
+      }
+
+      if (!jobUrl || typeof jobUrl !== 'string') {
+        return res.status(400).json({ message: "Valid job URL is required" });
+      }
+
+      const resumeFile = files?.resume?.[0];
+      if (!resumeFile) {
+        return res.status(400).json({ message: "Resume file is required" });
+      }
+
+      const coverLetterFile = files?.coverLetter?.[0];
+      
+      // Start the enhanced application process
+      const result = await enhancedAutomationService.startJobApplicationProcess(
+        jobUrl,
+        validationResult.data,
+        resumeFile.buffer,
+        coverLetterFile?.buffer
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error("Enhanced application error:", error);
+      res.status(500).json({ 
+        message: "Failed to start application process",
+        errorDetails: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Approval endpoint for email links
+  app.get("/api/approve-application/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { action } = req.query;
+
+      if (action === 'reject') {
+        // Update session status to rejected
+        const session = await storage.getApplicationSessionByToken(token);
+        if (session) {
+          await storage.updateApplicationSession(session.id, { status: 'failed' });
+        }
+        return res.send(`
+          <html>
+            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+              <h1>❌ Application Cancelled</h1>
+              <p>Your job application has been cancelled successfully.</p>
+              <p>You can close this window.</p>
+            </body>
+          </html>
+        `);
+      }
+
+      // Default to approve
+      const result = await enhancedAutomationService.approveAndSubmitApplication(token);
+
+      const statusEmoji = result.success ? '✅' : '❌';
+      const statusText = result.success ? 'Application Submitted Successfully!' : 'Application Failed';
+      const message = result.message;
+
+      res.send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>${statusEmoji} ${statusText}</h1>
+            <p>${message}</p>
+            <p>You can close this window. You should receive a confirmation email shortly.</p>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("Approval error:", error);
+      res.status(500).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>❌ Error</h1>
+            <p>Failed to process approval: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  // Get application sessions for a user
+  app.get("/api/users/:userId/sessions", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      // Note: In a real implementation, you'd add a method to get sessions by user
+      res.json([]);
+    } catch (error) {
+      console.error("Get sessions error:", error);
+      res.status(500).json({ message: "Failed to get sessions" });
+    }
   });
 
   const httpServer = createServer(app);

@@ -15,6 +15,13 @@ export interface IStorage {
   updateJobApplication(id: number, data: Partial<InsertJobApplication>): Promise<JobApplicationRecord>;
   getJobApplication(id: number): Promise<JobApplicationRecord | undefined>;
   
+  // Application session operations
+  createApplicationSession(insertSession: InsertApplicationSession): Promise<ApplicationSessionRecord>;
+  getApplicationSession(id: string): Promise<ApplicationSessionRecord | undefined>;
+  getApplicationSessionByToken(token: string): Promise<ApplicationSessionRecord | undefined>;
+  updateApplicationSession(id: string, data: Partial<InsertApplicationSession>): Promise<ApplicationSessionRecord>;
+  deleteExpiredSessions(): Promise<void>;
+  
   // Temporary data operations (for automation sessions)
   getTemporaryData(id: string): Promise<any>;
   setTemporaryData(id: string, data: any): Promise<void>;
@@ -92,6 +99,38 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTemporaryData(id: string): Promise<void> {
     this.tempData.delete(id);
+  }
+
+  // Application session methods
+  async createApplicationSession(insertSession: InsertApplicationSession): Promise<ApplicationSessionRecord> {
+    const [session] = await db
+      .insert(applicationSessions)
+      .values(insertSession)
+      .returning();
+    return session;
+  }
+
+  async getApplicationSession(id: string): Promise<ApplicationSessionRecord | undefined> {
+    const [session] = await db.select().from(applicationSessions).where(eq(applicationSessions.id, id));
+    return session || undefined;
+  }
+
+  async getApplicationSessionByToken(token: string): Promise<ApplicationSessionRecord | undefined> {
+    const [session] = await db.select().from(applicationSessions).where(eq(applicationSessions.approvalToken, token));
+    return session || undefined;
+  }
+
+  async updateApplicationSession(id: string, data: Partial<InsertApplicationSession>): Promise<ApplicationSessionRecord> {
+    const [session] = await db
+      .update(applicationSessions)
+      .set(data)
+      .where(eq(applicationSessions.id, id))
+      .returning();
+    return session;
+  }
+
+  async deleteExpiredSessions(): Promise<void> {
+    await db.delete(applicationSessions).where(lt(applicationSessions.expiresAt, new Date()));
   }
 }
 
