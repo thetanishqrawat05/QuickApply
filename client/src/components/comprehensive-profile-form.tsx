@@ -14,8 +14,8 @@ interface Experience {
   title: string;
   company: string;
   startDate: string;
-  endDate: string;
-  current: boolean;
+  endDate?: string;
+  current?: boolean;
   description: string;
 }
 
@@ -24,13 +24,13 @@ interface Education {
   major: string;
   school: string;
   graduationYear: string;
-  gpa: string;
+  gpa?: string;
 }
 
 export default function ComprehensiveProfileForm() {
   const [profile, setProfile] = useLocalStorage<Partial<ComprehensiveProfile>>("comprehensiveProfile", {});
-  const [experience, setExperience] = useState<Experience[]>(profile.experience || []);
-  const [education, setEducation] = useState<Education[]>(profile.education || []);
+  const [experience, setExperience] = useState<Experience[]>((profile.experience as Experience[]) || []);
+  const [education, setEducation] = useState<Education[]>((profile.education as Education[]) || []);
 
   const updateProfile = (field: keyof ComprehensiveProfile, value: any) => {
     setProfile(prev => ({ ...prev, [field]: value }));

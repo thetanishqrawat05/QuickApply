@@ -1,6 +1,16 @@
-import { users, jobApplications, type User, type InsertUser, type JobApplicationRecord, type InsertJobApplication } from "@shared/schema";
+import { 
+  users, 
+  jobApplications, 
+  applicationSessions,
+  type User, 
+  type InsertUser, 
+  type JobApplicationRecord, 
+  type InsertJobApplication,
+  type ApplicationSessionRecord,
+  type InsertApplicationSession
+} from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, lt } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -19,6 +29,7 @@ export interface IStorage {
   createApplicationSession(insertSession: InsertApplicationSession): Promise<ApplicationSessionRecord>;
   getApplicationSession(id: string): Promise<ApplicationSessionRecord | undefined>;
   getApplicationSessionByToken(token: string): Promise<ApplicationSessionRecord | undefined>;
+  getApplicationSessionsByUser(userId: number): Promise<ApplicationSessionRecord[]>;
   updateApplicationSession(id: string, data: Partial<InsertApplicationSession>): Promise<ApplicationSessionRecord>;
   deleteExpiredSessions(): Promise<void>;
   
@@ -127,6 +138,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(applicationSessions.id, id))
       .returning();
     return session;
+  }
+
+  async getApplicationSessionsByUser(userId: number): Promise<ApplicationSessionRecord[]> {
+    return db
+      .select()
+      .from(applicationSessions)
+      .where(eq(applicationSessions.userId, userId))
+      .orderBy(desc(applicationSessions.createdAt));
   }
 
   async deleteExpiredSessions(): Promise<void> {

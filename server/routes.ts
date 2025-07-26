@@ -424,8 +424,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid user ID" });
       }
 
-      // Note: In a real implementation, you'd add a method to get sessions by user
-      res.json([]);
+      const sessions = await storage.getApplicationSessionsByUser(userId);
+      res.json(sessions);
     } catch (error) {
       console.error("Get sessions error:", error);
       res.status(500).json({ message: "Failed to get sessions" });

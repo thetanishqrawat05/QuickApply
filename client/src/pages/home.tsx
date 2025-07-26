@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { HelpCircle, Settings, Bot } from "lucide-react";
+import { Link } from "wouter";
 import JobLinkInput from "@/components/job-link-input";
 import ProfileForm from "@/components/profile-form";
 import FileUpload, { getResumeFile, getCoverLetterFile } from "@/components/file-upload";
@@ -67,6 +68,11 @@ export default function Home() {
               <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Free</Badge>
             </div>
             <div className="flex items-center space-x-4">
+              <Link href="/enhanced-apply">
+                <Button variant="outline" size="sm" data-testid="button-enhanced-apply">
+                  Enhanced Apply
+                </Button>
+              </Link>
               <Button variant="ghost" size="sm">
                 <HelpCircle className="text-gray-500 text-lg" />
               </Button>
