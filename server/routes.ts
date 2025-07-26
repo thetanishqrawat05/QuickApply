@@ -361,9 +361,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fallback to mock automation if browser dependencies missing
         if (automationError instanceof Error && (
           automationError.message.includes('Host system is missing dependencies') ||
-          automationError.message.includes('browserType.launch')
+          automationError.message.includes('browserType.launch') ||
+          automationError.message.includes('BROWSER_DEPENDENCIES_MISSING')
         )) {
-          console.log('Using simulation mode due to browser environment limitations');
+          console.log('🔄 Browser dependencies unavailable, switching to simulation mode...');
           result = await mockAutomationService.startJobApplicationProcess(
             jobUrl,
             validationResult.data,
@@ -416,9 +417,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fallback to mock automation if browser dependencies missing
         if (automationError instanceof Error && (
           automationError.message.includes('Host system is missing dependencies') ||
-          automationError.message.includes('browserType.launch')
+          automationError.message.includes('browserType.launch') ||
+          automationError.message.includes('BROWSER_DEPENDENCIES_MISSING')
         )) {
-          console.log('Using simulation mode for approval due to browser environment limitations');
+          console.log('🔄 Browser dependencies unavailable for approval, switching to simulation mode...');
           result = await mockAutomationService.approveAndSubmitApplication(token);
         } else {
           throw automationError;

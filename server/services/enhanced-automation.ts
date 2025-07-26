@@ -14,36 +14,44 @@ export class EnhancedAutomationService {
 
   private async launchBrowser(): Promise<Browser> {
     if (!this.browser) {
-      this.browser = await chromium.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-          '--disable-gpu',
-          '--disable-web-security',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-background-timer-throttling',
-          '--disable-renderer-backgrounding',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-ipc-flooding-protection',
-          '--force-color-profile=srgb',
-          '--disable-extensions',
-          '--disable-default-apps',
-          '--disable-sync',
-          '--disable-translate',
-          '--hide-scrollbars',
-          '--metrics-recording-only',
-          '--mute-audio',
-          '--no-default-browser-check',
-          '--disable-background-networking'
-        ],
-        chromiumSandbox: false
-      });
+      try {
+        this.browser = await chromium.launch({
+          headless: true,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-background-timer-throttling',
+            '--disable-renderer-backgrounding',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-ipc-flooding-protection',
+            '--force-color-profile=srgb',
+            '--disable-extensions',
+            '--disable-default-apps',
+            '--disable-sync',
+            '--disable-translate',
+            '--hide-scrollbars',
+            '--metrics-recording-only',
+            '--mute-audio',
+            '--no-default-browser-check',
+            '--disable-background-networking'
+          ],
+          chromiumSandbox: false
+        });
+      } catch (error) {
+        // If browser launch fails due to missing dependencies, throw a specific error
+        if (error instanceof Error && error.message.includes('Host system is missing dependencies')) {
+          throw new Error('BROWSER_DEPENDENCIES_MISSING: ' + error.message);
+        }
+        throw error;
+      }
     }
     return this.browser;
   }
