@@ -5,41 +5,64 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    // Configure email transporter (you'll need to set up SMTP credentials)
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    // Configure Gmail SMTP transporter
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      this.transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS, // Gmail app password
+        },
+      });
+    } else {
+      console.warn('⚠️ Email credentials not configured. Emails will be skipped.');
+      // Create a test transporter that doesn't actually send emails
+      this.transporter = nodemailer.createTransport({
+        streamTransport: true,
+        newline: 'unix',
+        buffer: true
+      });
+    }
   }
 
   async sendReviewEmail(session: ApplicationSessionRecord, filledData: any): Promise<boolean> {
     try {
+      // Skip email sending if credentials not configured
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.warn('⚠️ Email credentials not configured. Skipping review email. Use manual approval URL:');
+        const approvalUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/approve-application/${session.approvalToken}`;
+        console.log(`🔗 Manual approval URL: ${approvalUrl}`);
+        return true; // Return true to continue workflow
+      }
+
       const profile = session.profileData as ComprehensiveProfile;
       const approvalUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/approve-application/${session.approvalToken}`;
       
       const htmlContent = this.generateReviewEmailHTML(session, profile, filledData, approvalUrl);
       
       await this.transporter.sendMail({
-        from: process.env.SMTP_FROM || '"Auto Job Applier" <noreply@autojobapplier.com>',
+        from: process.env.EMAIL_USER, // Use the same email as sender
         to: profile.email,
         subject: `📝 Job Application Ready for Your Approval - ${session.jobTitle || 'Position'} at ${session.company || 'Company'}`,
         html: htmlContent,
       });
 
+      console.log('✅ Review email sent successfully to:', profile.email);
       return true;
     } catch (error) {
-      console.error('Failed to send review email:', error);
+      console.error('❌ Failed to send review email:', error);
       return false;
     }
   }
 
   async sendConfirmationEmail(session: ApplicationSessionRecord, success: boolean): Promise<boolean> {
     try {
+      // Skip email sending if credentials not configured
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.warn('⚠️ Email credentials not configured. Skipping confirmation email.');
+        return true; // Return true to continue workflow
+      }
+
       const profile = session.profileData as ComprehensiveProfile;
       const subject = success 
         ? `✅ Application Submitted Successfully - ${session.jobTitle || 'Position'}`
@@ -48,7 +71,7 @@ export class EmailService {
       const htmlContent = this.generateConfirmationEmailHTML(session, success);
       
       await this.transporter.sendMail({
-        from: process.env.SMTP_FROM || '"Auto Job Applier" <noreply@autojobapplier.com>',
+        from: process.env.EMAIL_USER, // Use the same email as sender
         to: profile.email,
         subject,
         html: htmlContent,
