@@ -157,6 +157,7 @@ The architecture prioritizes user privacy, automation reliability, and ease of d
 - **Frontend**: Multi-step wizard collecting comprehensive profile data upfront
 - **Backend**: Enhanced automation service with email review capabilities + fallback mock service
 - **Database**: Application sessions table for managing approval workflow state
-- **Email System**: Automated review emails with approve/reject functionality
+- **Email System**: Gmail SMTP integration with EMAIL_USER/EMAIL_PASS credentials for review emails
 - **Security**: Token-based approval system preventing unauthorized submissions
 - **Automation**: Intelligent fallback from Playwright browser automation to simulation mode when browser dependencies are unavailable
+- **Email Fallback**: Manual approval URLs logged when email credentials unavailable
