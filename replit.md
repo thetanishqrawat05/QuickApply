@@ -150,10 +150,13 @@ The architecture prioritizes user privacy, automation reliability, and ease of d
 - ✓ Added Progress UI component and comprehensive form validation
 - ✓ Integrated Playwright automation with email notification system
 - ✓ Enhanced security with 24-hour token expiration for approval links
+- ✓ Added fallback mock automation service for environments with missing browser dependencies
+- ✓ Implemented intelligent fallback system that automatically switches to simulation mode
 
 **Technical Architecture for Email Workflow**
 - **Frontend**: Multi-step wizard collecting comprehensive profile data upfront
-- **Backend**: Enhanced automation service with email review capabilities  
+- **Backend**: Enhanced automation service with email review capabilities + fallback mock service
 - **Database**: Application sessions table for managing approval workflow state
 - **Email System**: Automated review emails with approve/reject functionality
 - **Security**: Token-based approval system preventing unauthorized submissions
+- **Automation**: Intelligent fallback from Playwright browser automation to simulation mode when browser dependencies are unavailable
