@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
-import { applyJobRequestSchema } from "@shared/schema";
+import { applyJobRequestSchema, bulkApplyRequestSchema } from "@shared/schema";
 import { AutomationService } from "./services/automation";
 
 const upload = multer({
@@ -96,6 +96,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Job application error:", error);
       res.status(500).json({ 
         message: "Failed to process job application",
+        errorDetails: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Bulk apply to multiple jobs
+  app.post("/api/bulk-apply", upload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'coverLetter', maxCount: 1 }
+  ]), async (req, res) => {
+    try {
+      const { jobUrls, profile } = req.body;
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      // Parse data
+      let parsedJobUrls, parsedProfile;
+      try {
+        parsedJobUrls = typeof jobUrls === 'string' ? JSON.parse(jobUrls) : jobUrls;
+        parsedProfile = typeof profile === 'string' ? JSON.parse(profile) : profile;
+      } catch (error) {
+        return res.status(400).json({ message: "Invalid request data format" });
+      }
+
+      // Validate request data
+      const validationResult = bulkApplyRequestSchema.safeParse({
+        jobUrls: parsedJobUrls,
+        profile: parsedProfile
+      });
+
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request data",
+          errors: validationResult.error.errors
+        });
+      }
+
+      const resumeFile = files?.resume?.[0];
+      const coverLetterFile = files?.coverLetter?.[0];
+
+      if (!resumeFile) {
+        return res.status(400).json({ message: "Resume file is required" });
+      }
+
+      // Process bulk applications
+      const results = [];
+      const totalJobs = parsedJobUrls.length;
+      
+      for (let i = 0; i < parsedJobUrls.length; i++) {
+        const jobUrl = parsedJobUrls[i];
+        
+        try {
+          const applicationData = {
+            jobUrl,
+            profile: parsedProfile,
+            resumeFile,
+            coverLetterFile
+          };
+
+          const result = await automationService.applyToJob(applicationData);
+          results.push({
+            jobUrl,
+            success: result.success,
+            result
+          });
+
+          // Send progress update (in a real app, you'd use WebSockets or Server-Sent Events)
+          console.log(`Progress: ${i + 1}/${totalJobs} - ${jobUrl} - ${result.success ? 'Success' : 'Failed'}`);
+
+        } catch (error) {
+          results.push({
+            jobUrl,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+
+        // Add delay between applications
+        if (i < parsedJobUrls.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+        }
+      }
+
+      const successful = results.filter(r => r.success).length;
+      const failed = results.length - successful;
+
+      res.json({
+        totalJobs,
+        successful,
+        failed,
+        results
+      });
+
+    } catch (error) {
+      console.error("Bulk application error:", error);
+      res.status(500).json({ 
+        message: "Failed to process bulk applications",
         errorDetails: error instanceof Error ? error.message : "Unknown error"
       });
     }

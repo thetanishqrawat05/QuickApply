@@ -70,14 +70,16 @@ export class AutomationService {
         return {
           success: true,
           message: `Successfully applied to job on ${platform}`,
-          applicationId
+          applicationId,
+          submissionConfirmed: result.submissionConfirmed || false
         };
       } else {
         return {
           success: false,
           message: result.message || `Failed to apply on ${platform}`,
           applicationId,
-          errorDetails: result.errorDetails
+          errorDetails: result.errorDetails,
+          submissionConfirmed: false
         };
       }
 
@@ -87,7 +89,8 @@ export class AutomationService {
         success: false,
         message: 'Failed to process job application',
         applicationId,
-        errorDetails: error instanceof Error ? error.message : 'Unknown error'
+        errorDetails: error instanceof Error ? error.message : 'Unknown error',
+        submissionConfirmed: false
       };
     } finally {
       if (page) await page.close();

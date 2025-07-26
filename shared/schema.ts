@@ -21,9 +21,16 @@ export const applicationHistoryItemSchema = z.object({
   platform: z.string(),
   jobTitle: z.string().optional(),
   company: z.string().optional(),
-  status: z.enum(["applied", "failed", "needs_review"]),
+  status: z.enum(["applied", "failed", "needs_review", "pending", "retrying"]),
   appliedAt: z.string(),
   errorMessage: z.string().optional(),
+  retryCount: z.number().default(0),
+  submissionConfirmed: z.boolean().default(false),
+});
+
+export const bulkApplyRequestSchema = z.object({
+  jobUrls: z.array(z.string().url()).min(1).max(50),
+  profile: profileSchema,
 });
 
 export const applyJobRequestSchema = z.object({
@@ -36,6 +43,16 @@ export const applyJobResponseSchema = z.object({
   message: z.string(),
   applicationId: z.string().optional(),
   errorDetails: z.string().optional(),
+  submissionConfirmed: z.boolean().default(false),
+});
+
+export const bulkApplyProgressSchema = z.object({
+  totalJobs: z.number(),
+  completedJobs: z.number(),
+  successfulJobs: z.number(),
+  failedJobs: z.number(),
+  currentJobUrl: z.string().optional(),
+  isComplete: z.boolean(),
 });
 
 export type Profile = z.infer<typeof profileSchema>;
@@ -43,6 +60,8 @@ export type JobApplication = z.infer<typeof jobApplicationSchema>;
 export type ApplicationHistoryItem = z.infer<typeof applicationHistoryItemSchema>;
 export type ApplyJobRequest = z.infer<typeof applyJobRequestSchema>;
 export type ApplyJobResponse = z.infer<typeof applyJobResponseSchema>;
+export type BulkApplyRequest = z.infer<typeof bulkApplyRequestSchema>;
+export type BulkApplyProgress = z.infer<typeof bulkApplyProgressSchema>;
 
 export interface ApplicationStats {
   total: number;

@@ -8,6 +8,7 @@ import ProfileForm from "@/components/profile-form";
 import FileUpload from "@/components/file-upload";
 import ApplicationHistory from "@/components/application-history";
 import ApplicationStats from "@/components/application-stats";
+// import BulkApply from "@/components/bulk-apply";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useApplicationAutomation } from "@/hooks/use-application-automation";
 import { Profile } from "@shared/schema";
@@ -120,6 +121,9 @@ export default function Home() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Bulk Apply - Coming Soon */}
+            {/* <BulkApply /> */}
 
             {/* Application History */}
             <ApplicationHistory />

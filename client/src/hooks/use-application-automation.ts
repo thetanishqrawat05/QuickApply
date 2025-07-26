@@ -50,6 +50,8 @@ export function useApplicationAutomation() {
         platform: 'Detecting...',
         status: 'needs_review',
         appliedAt: new Date().toISOString(),
+        retryCount: 0,
+        submissionConfirmed: false,
       };
 
       setHistory(prev => [tempApplication, ...prev]);
