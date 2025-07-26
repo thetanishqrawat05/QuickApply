@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { HelpCircle, Settings, Bot } from "lucide-react";
 import JobLinkInput from "@/components/job-link-input";
 import ProfileForm from "@/components/profile-form";
-import FileUpload from "@/components/file-upload";
+import FileUpload, { getResumeFile, getCoverLetterFile } from "@/components/file-upload";
 import ApplicationHistory from "@/components/application-history";
 import ApplicationStats from "@/components/application-stats";
 // import BulkApply from "@/components/bulk-apply";
@@ -21,9 +21,21 @@ export default function Home() {
     email: "",
     phone: "",
   });
-  const [resumeFile] = useLocalStorage<File | null>("resumeFile", null);
+  const [resumeFile, setResumeFile] = useState<File | null>(getResumeFile());
+  const [coverLetterFile, setCoverLetterFile] = useState<File | null>(getCoverLetterFile());
   
   const { applyToJob, isApplying } = useApplicationAutomation();
+
+  // Update file state when global files change
+  useEffect(() => {
+    const updateFiles = () => {
+      setResumeFile(getResumeFile());
+      setCoverLetterFile(getCoverLetterFile());
+    };
+    
+    const interval = setInterval(updateFiles, 100); // Poll for file changes
+    return () => clearInterval(interval);
+  }, []);
 
   const handleApplyNow = async () => {
     if (!jobUrl || !profile.name || !profile.email || !profile.phone || !resumeFile) {
@@ -34,6 +46,7 @@ export default function Home() {
       jobUrl,
       profile,
       resumeFile,
+      coverLetterFile: coverLetterFile || undefined,
     });
   };
 

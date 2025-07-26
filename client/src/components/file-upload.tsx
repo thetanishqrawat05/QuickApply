@@ -1,14 +1,21 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Upload, CloudUpload, FileText, Trash2, CheckCircle } from "lucide-react";
-import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useToast } from "@/hooks/use-toast";
 
+// Global state for files to avoid localStorage serialization issues
+let globalResumeFile: File | null = null;
+let globalCoverLetterFile: File | null = null;
+let fileUpdateListeners: Set<() => void> = new Set();
+
+export const getResumeFile = () => globalResumeFile;
+export const getCoverLetterFile = () => globalCoverLetterFile;
+
 export default function FileUpload() {
-  const [resumeFile, setResumeFile] = useLocalStorage<File | null>("resumeFile", null);
-  const [coverLetterFile, setCoverLetterFile] = useLocalStorage<File | null>("coverLetterFile", null);
+  const [resumeFile, setResumeFileState] = useState<File | null>(globalResumeFile);
+  const [coverLetterFile, setCoverLetterFileState] = useState<File | null>(globalCoverLetterFile);
   const [isDragging, setIsDragging] = useState<string | null>(null);
   
   const resumeInputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +45,35 @@ export default function FileUpload() {
     }
 
     return true;
+  };
+
+  // Set up listener for global state changes
+  useEffect(() => {
+    const updateFiles = () => {
+      setResumeFileState(globalResumeFile);
+      setCoverLetterFileState(globalCoverLetterFile);
+    };
+    
+    fileUpdateListeners.add(updateFiles);
+    return () => {
+      fileUpdateListeners.delete(updateFiles);
+    };
+  }, []);
+
+  const notifyListeners = () => {
+    fileUpdateListeners.forEach(listener => listener());
+  };
+
+  const setResumeFile = (file: File | null) => {
+    globalResumeFile = file;
+    setResumeFileState(file);
+    notifyListeners();
+  };
+
+  const setCoverLetterFile = (file: File | null) => {
+    globalCoverLetterFile = file;
+    setCoverLetterFileState(file);
+    notifyListeners();
   };
 
   const handleFileSelect = (file: File, type: 'resume' | 'coverLetter') => {
