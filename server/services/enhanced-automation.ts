@@ -12,6 +12,42 @@ export class EnhancedAutomationService {
     this.emailService = new EmailService();
   }
 
+  private async launchBrowser(): Promise<Browser> {
+    if (!this.browser) {
+      this.browser = await chromium.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-ipc-flooding-protection',
+          '--force-color-profile=srgb',
+          '--disable-extensions',
+          '--disable-default-apps',
+          '--disable-sync',
+          '--disable-translate',
+          '--hide-scrollbars',
+          '--metrics-recording-only',
+          '--mute-audio',
+          '--no-default-browser-check',
+          '--disable-background-networking'
+        ],
+        chromiumSandbox: false
+      });
+    }
+    return this.browser;
+  }
+
   async startJobApplicationProcess(
     jobUrl: string, 
     profile: ComprehensiveProfile,
@@ -155,20 +191,7 @@ export class EnhancedAutomationService {
     let context: BrowserContext | null = null;
     
     try {
-      if (!this.browser) {
-        this.browser = await chromium.launch({
-          headless: true,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu'
-          ]
-        });
-      }
+      await this.launchBrowser();
 
       context = await this.browser.newContext({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -203,20 +226,7 @@ export class EnhancedAutomationService {
     let context: BrowserContext | null = null;
     
     try {
-      if (!this.browser) {
-        this.browser = await chromium.launch({
-          headless: true,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu'
-          ]
-        });
-      }
+      await this.launchBrowser();
 
       context = await this.browser.newContext();
       const page = await context.newPage();
