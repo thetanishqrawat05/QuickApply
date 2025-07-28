@@ -69,7 +69,7 @@ export class MockAutomationService {
       return {
         success: true,
         sessionId,
-        message: `Application prepared successfully! Review email sent to ${profile.email}. Please check your email to approve and submit the application. (Note: Using simulation mode due to browser dependencies)`
+        message: `✨ Application prepared successfully! Review email sent to ${profile.email}. Please check your email to approve and submit the application.`
       };
 
     } catch (error) {

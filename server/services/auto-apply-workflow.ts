@@ -67,8 +67,13 @@ export class AutoApplyWorkflowService {
           chromiumSandbox: false
         });
       } catch (error) {
-        if (error instanceof Error && error.message.includes('Host system is missing dependencies')) {
-          throw new Error('BROWSER_DEPENDENCIES_MISSING: ' + error.message);
+        console.error('Failed to launch browser:', error);
+        if (error instanceof Error && (
+          error.message.includes('Executable doesn\'t exist') ||
+          error.message.includes('Host system is missing dependencies') ||
+          error.message.includes('browserType.launch')
+        )) {
+          throw new Error('BROWSER_DEPENDENCIES_MISSING: Playwright browsers not installed. Please run: npx playwright install');
         }
         throw error;
       }

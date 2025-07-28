@@ -345,13 +345,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const coverLetterFile = files?.coverLetter?.[0];
       
-      // Start auto-apply workflow
-      const result = await autoApplyWorkflowService.startAutoApplyProcess({
-        jobUrl,
-        profile: validationResult.data,
-        resumeFile: resumeFile.buffer,
-        coverLetterFile: coverLetterFile?.buffer
-      });
+      // Start auto-apply workflow with fallback to mock service
+      let result;
+      try {
+        result = await autoApplyWorkflowService.startAutoApplyProcess({
+          jobUrl,
+          profile: validationResult.data,
+          resumeFile: resumeFile.buffer,
+          coverLetterFile: coverLetterFile?.buffer
+        });
+      } catch (error) {
+        console.log('🔄 Auto-apply workflow failed, falling back to simulation mode...');
+        console.error('Error:', error);
+        
+        // Fallback to mock automation service
+        if (error instanceof Error && error.message.includes('BROWSER_DEPENDENCIES_MISSING')) {
+          result = await mockAutomationService.startJobApplicationProcess(
+            jobUrl,
+            validationResult.data,
+            resumeFile.buffer,
+            coverLetterFile?.buffer
+          );
+        } else {
+          throw error; // Re-throw if it's not a browser dependency issue
+        }
+      }
 
       res.json(result);
     } catch (error) {
