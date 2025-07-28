@@ -174,9 +174,20 @@ export function AutoApplyWorkflow() {
       </div>
 
       <Button 
-        onClick={() => setCurrentStep(2)} 
+        onClick={() => {
+          if (!jobUrl) {
+            toast({
+              title: "Job URL Required",
+              description: "Please enter a valid job URL to continue",
+              variant: "destructive"
+            });
+            return;
+          }
+          setCurrentStep(2);
+        }} 
         className="w-full"
         size="lg"
+        disabled={!jobUrl}
       >
         Continue to Profile Setup
       </Button>
@@ -323,14 +334,25 @@ export function AutoApplyWorkflow() {
             onClick={() => setCurrentStep(1)}
             className="flex-1"
           >
-            Back
+            ← Back to URL
           </Button>
           <Button 
             type="button" 
-            onClick={() => setCurrentStep(3)}
+            onClick={() => {
+              const profileValid = form.getValues('name') && form.getValues('email') && form.getValues('phone');
+              if (!profileValid) {
+                toast({
+                  title: "Profile Required",
+                  description: "Please fill in name, email, and phone to continue",
+                  variant: "destructive"
+                });
+                return;
+              }
+              setCurrentStep(3);
+            }}
             className="flex-1"
           >
-            Continue to Files
+            Continue to Files →
           </Button>
         </div>
       </Form>
@@ -404,7 +426,7 @@ export function AutoApplyWorkflow() {
           onClick={() => setCurrentStep(2)}
           className="flex-1"
         >
-          Back
+          ← Back to Profile
         </Button>
         <Button 
           onClick={form.handleSubmit(onSubmit)}
@@ -417,7 +439,7 @@ export function AutoApplyWorkflow() {
               Starting Auto-Apply...
             </>
           ) : (
-            'Start Auto-Apply Workflow'
+            'Start Auto-Apply Workflow 🚀'
           )}
         </Button>
       </div>
@@ -487,7 +509,14 @@ export function AutoApplyWorkflow() {
           }}
           className="flex-1"
         >
-          Start New Application
+          🔄 Start New Application
+        </Button>
+        <Button 
+          variant="default"
+          onClick={() => window.open('/', '_blank')}
+          className="flex-1"
+        >
+          📊 View Dashboard
         </Button>
       </div>
     </div>
@@ -503,21 +532,29 @@ export function AutoApplyWorkflow() {
         
         {/* Progress indicator */}
         <div className="flex justify-center mt-4">
-          <div className="flex items-center space-x-2">
-            {[1, 2, 3, 4].map((step) => (
-              <div key={step} className="flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step === currentStep
-                      ? 'bg-blue-500 text-white'
-                      : step < currentStep
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  {step < currentStep ? <CheckCircle className="h-4 w-4" /> : step}
+          <div className="flex items-center">
+            {[
+              { num: 1, label: 'URL' },
+              { num: 2, label: 'Profile' },
+              { num: 3, label: 'Files' },
+              { num: 4, label: 'Submit' }
+            ].map((step, index) => (
+              <div key={step.num} className="flex items-center">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      step.num === currentStep
+                        ? 'bg-blue-500 text-white'
+                        : step.num < currentStep
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {step.num < currentStep ? <CheckCircle className="h-4 w-4" /> : step.num}
+                  </div>
+                  <span className="text-xs mt-1 text-gray-500">{step.label}</span>
                 </div>
-                {step < 4 && <div className={`w-12 h-0.5 ml-2 ${step < currentStep ? 'bg-green-500' : 'bg-gray-200'}`} />}
+                {index < 3 && <div className={`w-12 h-0.5 mx-2 mt-[-10px] ${step.num < currentStep ? 'bg-green-500' : 'bg-gray-200'}`} />}
               </div>
             ))}
           </div>
