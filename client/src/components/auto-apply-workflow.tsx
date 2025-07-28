@@ -108,6 +108,8 @@ export function AutoApplyWorkflow() {
     }
   };
 
+  const [jobUrl, setJobUrl] = useState('');
+
   const onSubmit = (data: ComprehensiveProfile) => {
     if (!resumeFile) {
       toast({
@@ -118,8 +120,6 @@ export function AutoApplyWorkflow() {
       return;
     }
 
-    // Extract job URL from form data
-    const jobUrl = (document.getElementById('jobUrl') as HTMLInputElement).value;
     if (!jobUrl) {
       toast({
         title: "Job URL Required",
@@ -153,6 +153,8 @@ export function AutoApplyWorkflow() {
             type="url"
             placeholder="https://company.com/careers/job-123"
             className="mt-1"
+            value={jobUrl}
+            onChange={(e) => setJobUrl(e.target.value)}
           />
           <p className="text-sm text-muted-foreground mt-1">
             Supports: Greenhouse, Lever, Workday, BambooHR, SmartRecruiters, and company career sites
@@ -480,6 +482,7 @@ export function AutoApplyWorkflow() {
             setApplicationResult(null);
             setResumeFile(null);
             setCoverLetterFile(null);
+            setJobUrl('');
             form.reset();
           }}
           className="flex-1"
@@ -502,7 +505,7 @@ export function AutoApplyWorkflow() {
         <div className="flex justify-center mt-4">
           <div className="flex items-center space-x-2">
             {[1, 2, 3, 4].map((step) => (
-              <React.Fragment key={step}>
+              <div key={step} className="flex items-center">
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                     step === currentStep
@@ -514,8 +517,8 @@ export function AutoApplyWorkflow() {
                 >
                   {step < currentStep ? <CheckCircle className="h-4 w-4" /> : step}
                 </div>
-                {step < 4 && <div className={`w-12 h-0.5 ${step < currentStep ? 'bg-green-500' : 'bg-gray-200'}`} />}
-              </React.Fragment>
+                {step < 4 && <div className={`w-12 h-0.5 ml-2 ${step < currentStep ? 'bg-green-500' : 'bg-gray-200'}`} />}
+              </div>
             ))}
           </div>
         </div>
