@@ -2,12 +2,15 @@ import {
   users, 
   jobApplications, 
   applicationSessions,
+  applicationLogs,
   type User, 
   type InsertUser, 
   type JobApplicationRecord, 
   type InsertJobApplication,
   type ApplicationSessionRecord,
-  type InsertApplicationSession
+  type InsertApplicationSession,
+  type ApplicationLogRecord,
+  type InsertApplicationLog
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt } from "drizzle-orm";
@@ -28,10 +31,16 @@ export interface IStorage {
   // Application session operations
   createApplicationSession(insertSession: InsertApplicationSession): Promise<ApplicationSessionRecord>;
   getApplicationSession(id: string): Promise<ApplicationSessionRecord | undefined>;
+  getApplicationSessionById(id: string): Promise<ApplicationSessionRecord | undefined>;
   getApplicationSessionByToken(token: string): Promise<ApplicationSessionRecord | undefined>;
   getApplicationSessionsByUser(userId: number): Promise<ApplicationSessionRecord[]>;
   updateApplicationSession(id: string, data: Partial<InsertApplicationSession>): Promise<ApplicationSessionRecord>;
   deleteExpiredSessions(): Promise<void>;
+  
+  // Application log operations
+  createApplicationLog(insertLog: InsertApplicationLog): Promise<ApplicationLogRecord>;
+  getApplicationLogsByUser(userId: number): Promise<ApplicationLogRecord[]>;
+  getApplicationLogsBySession(sessionId: string): Promise<ApplicationLogRecord[]>;
   
   // Temporary data operations (for automation sessions)
   getTemporaryData(id: string): Promise<any>;
@@ -126,6 +135,10 @@ export class DatabaseStorage implements IStorage {
     return session || undefined;
   }
 
+  async getApplicationSessionById(id: string): Promise<ApplicationSessionRecord | undefined> {
+    return this.getApplicationSession(id);
+  }
+
   async getApplicationSessionByToken(token: string): Promise<ApplicationSessionRecord | undefined> {
     const [session] = await db.select().from(applicationSessions).where(eq(applicationSessions.approvalToken, token));
     return session || undefined;
@@ -150,6 +163,22 @@ export class DatabaseStorage implements IStorage {
 
   async deleteExpiredSessions(): Promise<void> {
     await db.delete(applicationSessions).where(lt(applicationSessions.expiresAt, new Date()));
+  }
+
+  async createApplicationLog(insertLog: InsertApplicationLog): Promise<ApplicationLogRecord> {
+    const [log] = await db
+      .insert(applicationLogs)
+      .values(insertLog)
+      .returning();
+    return log;
+  }
+
+  async getApplicationLogsByUser(userId: number): Promise<ApplicationLogRecord[]> {
+    return await db.select().from(applicationLogs).where(eq(applicationLogs.userId, userId)).orderBy(desc(applicationLogs.timestamp));
+  }
+
+  async getApplicationLogsBySession(sessionId: string): Promise<ApplicationLogRecord[]> {
+    return await db.select().from(applicationLogs).where(eq(applicationLogs.sessionId, sessionId)).orderBy(desc(applicationLogs.timestamp));
   }
 }
 

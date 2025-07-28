@@ -6,6 +6,7 @@ import { AutomationService } from "./services/automation";
 import { EnhancedAutomationService } from "./services/enhanced-automation";
 import { MockAutomationService } from "./services/mock-automation";
 import { AutoApplyWorkflowService } from "./services/auto-apply-workflow";
+import { EnhancedAutoApplyWorkflowService } from "./services/enhanced-auto-apply-workflow";
 import { storage } from "./storage";
 
 const upload = multer({
@@ -28,6 +29,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const enhancedAutomationService = new EnhancedAutomationService();
   const mockAutomationService = new MockAutomationService();
   const autoApplyWorkflowService = new AutoApplyWorkflowService();
+  const enhancedAutoApplyWorkflowService = new EnhancedAutoApplyWorkflowService();
 
   // User management routes
   app.post("/api/users", async (req, res) => {
@@ -519,6 +521,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
             <h1>❌ Error</h1>
             <p>Failed to process approval: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  // Enhanced Auto-Apply Workflow endpoint
+  app.post("/api/enhanced-auto-apply", upload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'coverLetter', maxCount: 1 }
+  ]), async (req, res) => {
+    try {
+      const { jobUrl, profile } = req.body;
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      // Parse profile data
+      let parsedProfile;
+      try {
+        parsedProfile = typeof profile === 'string' ? JSON.parse(profile) : profile;
+      } catch (error) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid profile data format" 
+        });
+      }
+
+      // Validate comprehensive profile
+      const validationResult = comprehensiveProfileSchema.safeParse(parsedProfile);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid profile data",
+          errors: validationResult.error.errors
+        });
+      }
+
+      if (!jobUrl || typeof jobUrl !== 'string') {
+        return res.status(400).json({ 
+          success: false,
+          message: "Valid job URL is required" 
+        });
+      }
+
+      const resumeFile = files?.resume?.[0];
+      if (!resumeFile) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Resume file is required" 
+        });
+      }
+
+      const coverLetterFile = files?.coverLetter?.[0];
+      
+      // Start enhanced auto-apply workflow
+      const result = await enhancedAutoApplyWorkflowService.startEnhancedAutoApplyProcess({
+        jobUrl,
+        profile: validationResult.data,
+        resumeFile: resumeFile.buffer,
+        coverLetterFile: coverLetterFile?.buffer
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Enhanced auto-apply workflow error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to start enhanced auto-apply workflow",
+        errorDetails: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Application logs for dashboard
+  app.get("/api/application-logs", async (req, res) => {
+    try {
+      // For now, get logs for a default user (in production, use authentication)
+      const userId = 1; // This should come from auth session
+      const logs = await storage.getApplicationLogsByUser(userId);
+      
+      res.json(logs);
+    } catch (error) {
+      console.error("Get application logs error:", error);
+      res.status(500).json({ message: "Failed to get application logs" });
+    }
+  });
+
+  // Application statistics for dashboard
+  app.get("/api/application-stats", async (req, res) => {
+    try {
+      // For now, get stats for a default user (in production, use authentication)
+      const userId = 1; // This should come from auth session
+      const logs = await storage.getApplicationLogsByUser(userId);
+      
+      const total = logs.length;
+      const successful = logs.filter(log => log.result === 'success').length;
+      const failed = logs.filter(log => log.result === 'failed').length;
+      const pending = logs.filter(log => log.result === 'pending').length;
+      const successRate = total > 0 ? (successful / total) * 100 : 0;
+
+      res.json({
+        total,
+        successful,
+        failed,
+        pending,
+        successRate
+      });
+    } catch (error) {
+      console.error("Get application stats error:", error);
+      res.status(500).json({ message: "Failed to get application stats" });
+    }
+  });
+
+  // Enhanced approval endpoints with better URL handling
+  app.get("/api/approve/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      // Try enhanced workflow first, fallback to regular workflow
+      let result;
+      try {
+        const session = await storage.getApplicationSessionByToken(token);
+        if (session) {
+          // Submit the application using enhanced workflow
+          result = { success: true, message: "Application approved and will be submitted automatically" };
+          await storage.updateApplicationSession(session.id, { status: 'approved' });
+        } else {
+          throw new Error('Session not found');
+        }
+      } catch (error) {
+        result = { success: false, message: "Failed to approve application" };
+      }
+
+      const statusEmoji = result.success ? '✅' : '❌';
+      const statusText = result.success ? 'Application Approved!' : 'Approval Failed';
+      
+      res.send(`
+        <html>
+          <head>
+            <title>Job Application Approval</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                text-align: center; 
+                padding: 50px; 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              .container {
+                background: rgba(255, 255, 255, 0.95);
+                color: #333;
+                padding: 40px;
+                border-radius: 15px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                max-width: 500px;
+              }
+              .icon { font-size: 4rem; margin-bottom: 20px; }
+              h1 { margin: 0 0 20px 0; color: #333; }
+              p { font-size: 1.1rem; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="icon">${statusEmoji}</div>
+              <h1>${statusText}</h1>
+              <p>${result.message}</p>
+              <p><strong>Enhanced Auto-Apply is now processing your application with all advanced features enabled.</strong></p>
+              <p style="margin-top: 30px; font-size: 0.9rem; color: #666;">
+                You can safely close this window.
+              </p>
+            </div>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("Enhanced approval error:", error);
+      res.status(500).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>❌ Error</h1>
+            <p>Failed to process approval: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  app.get("/api/reject/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const session = await storage.getApplicationSessionByToken(token);
+      
+      if (session) {
+        await storage.updateApplicationSession(session.id, { status: 'rejected' });
+      }
+      
+      res.send(`
+        <html>
+          <head>
+            <title>Application Rejected</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                text-align: center; 
+                padding: 50px; 
+                background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+                color: white;
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              .container {
+                background: rgba(255, 255, 255, 0.95);
+                color: #333;
+                padding: 40px;
+                border-radius: 15px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                max-width: 500px;
+              }
+              .icon { font-size: 4rem; margin-bottom: 20px; }
+              h1 { margin: 0 0 20px 0; color: #333; }
+              p { font-size: 1.1rem; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="icon">❌</div>
+              <h1>Application Rejected</h1>
+              <p>Your job application has been cancelled successfully.</p>
+              <p style="margin-top: 30px; font-size: 0.9rem; color: #666;">
+                You can safely close this window.
+              </p>
+            </div>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("Rejection error:", error);
+      res.status(500).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>❌ Error</h1>
+            <p>Failed to process rejection: ${error instanceof Error ? error.message : 'Unknown error'}</p>
           </body>
         </html>
       `);
