@@ -153,11 +153,25 @@ The architecture prioritizes user privacy, automation reliability, and ease of d
 - ✓ Added fallback mock automation service for environments with missing browser dependencies
 - ✓ Implemented intelligent fallback system that automatically switches to simulation mode
 
-**Technical Architecture for Email Workflow**
+**Auto-Apply Workflow System (January 28, 2025)**
+- ✓ Built comprehensive auto-apply workflow tool with 60-second timer system
+- ✓ Created AutoApplyWorkflowService with intelligent form detection and filling
+- ✓ Implemented email review process with manual approval or auto-submit options
+- ✓ Added multi-platform support (Greenhouse, Lever, Workday, BambooHR, etc.)
+- ✓ Built React frontend with step-by-step wizard interface (/auto-apply)
+- ✓ Integrated CAPTCHA detection and auto-login handling capabilities
+- ✓ Added comprehensive file upload system with temporary file management
+- ✓ Created timer-based submission system with cleanup and error handling
+- ✓ Enhanced email templates with application preview and approval links
+
+**Technical Architecture for Auto-Apply Workflow**
 - **Frontend**: Multi-step wizard collecting comprehensive profile data upfront
-- **Backend**: Enhanced automation service with email review capabilities + fallback mock service
-- **Database**: Application sessions table for managing approval workflow state
-- **Email System**: Gmail SMTP integration with EMAIL_USER/EMAIL_PASS credentials for review emails
+- **Backend**: AutoApplyWorkflowService with Playwright browser automation + fallback systems
+- **Database**: Application sessions table for managing approval workflow state with 24-hour token expiration
+- **Email System**: Gmail SMTP integration with EMAIL_USER/EMAIL_PASS credentials for review and confirmation emails
 - **Security**: Token-based approval system preventing unauthorized submissions
 - **Automation**: Intelligent fallback from Playwright browser automation to simulation mode when browser dependencies are unavailable
-- **Email Fallback**: Manual approval URLs logged when email credentials unavailable
+- **Timer System**: 60-second auto-submit countdown with manual approval override capability
+- **Platform Support**: Multi-platform form detection and filling (Greenhouse, Lever, Workday, company sites)
+- **File Management**: Temporary file handling for resume and cover letter uploads with automatic cleanup
+- **Email Workflow**: Review email → 60s timer → auto-submit OR manual approval → confirmation email

@@ -73,6 +73,11 @@ export default function Home() {
                   Enhanced Apply
                 </Button>
               </Link>
+              <Link href="/auto-apply">
+                <Button variant="default" size="sm" data-testid="button-auto-apply">
+                  Auto-Apply Workflow
+                </Button>
+              </Link>
               <Button variant="ghost" size="sm">
                 <HelpCircle className="text-gray-500 text-lg" />
               </Button>

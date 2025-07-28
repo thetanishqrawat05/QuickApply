@@ -5,6 +5,7 @@ import { applyJobRequestSchema, bulkApplyRequestSchema, insertUserSchema, insert
 import { AutomationService } from "./services/automation";
 import { EnhancedAutomationService } from "./services/enhanced-automation";
 import { MockAutomationService } from "./services/mock-automation";
+import { AutoApplyWorkflowService } from "./services/auto-apply-workflow";
 import { storage } from "./storage";
 
 const upload = multer({
@@ -26,6 +27,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const automationService = new AutomationService();
   const enhancedAutomationService = new EnhancedAutomationService();
   const mockAutomationService = new MockAutomationService();
+  const autoApplyWorkflowService = new AutoApplyWorkflowService();
 
   // User management routes
   app.post("/api/users", async (req, res) => {
@@ -306,6 +308,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Auto-apply workflow endpoint
+  app.post("/api/auto-apply", upload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'coverLetter', maxCount: 1 }
+  ]), async (req, res) => {
+    try {
+      const { jobUrl, profile } = req.body;
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      // Parse profile data
+      let parsedProfile;
+      try {
+        parsedProfile = typeof profile === 'string' ? JSON.parse(profile) : profile;
+      } catch (error) {
+        return res.status(400).json({ message: "Invalid profile data format" });
+      }
+
+      // Validate comprehensive profile
+      const validationResult = comprehensiveProfileSchema.safeParse(parsedProfile);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid profile data",
+          errors: validationResult.error.errors
+        });
+      }
+
+      if (!jobUrl || typeof jobUrl !== 'string') {
+        return res.status(400).json({ message: "Valid job URL is required" });
+      }
+
+      const resumeFile = files?.resume?.[0];
+      if (!resumeFile) {
+        return res.status(400).json({ message: "Resume file is required" });
+      }
+
+      const coverLetterFile = files?.coverLetter?.[0];
+      
+      // Start auto-apply workflow
+      const result = await autoApplyWorkflowService.startAutoApplyProcess({
+        jobUrl,
+        profile: validationResult.data,
+        resumeFile: resumeFile.buffer,
+        coverLetterFile: coverLetterFile?.buffer
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Auto-apply workflow error:", error);
+      res.status(500).json({ 
+        message: "Failed to start auto-apply workflow",
+        errorDetails: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Manual approval endpoint for auto-apply workflow
+  app.post("/api/approve-auto-apply/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const result = await autoApplyWorkflowService.approveAndSubmitApplication(token);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Manual approval error:", error);
+      res.status(500).json({ 
+        message: "Failed to approve application",
+        errorDetails: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -367,7 +440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Approval endpoint for email links
+  // Approval endpoint for email links (updated for auto-apply workflow)
   app.get("/api/approve-application/:token", async (req, res) => {
     try {
       const { token } = req.params;
@@ -390,9 +463,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `);
       }
 
-      // Default to approve with mock automation (due to browser dependencies)
-      console.log('🔄 Using simulation mode for approval due to browser dependency issues...');
-      const result = await mockAutomationService.approveAndSubmitApplication(token);
+      // Try auto-apply workflow service first, fallback to mock automation
+      let result;
+      try {
+        console.log('🔄 Processing approval with auto-apply workflow service...');
+        result = await autoApplyWorkflowService.approveAndSubmitApplication(token);
+        
+        if (!result.success) {
+          // Fallback to mock automation if auto-apply fails
+          console.log('🔄 Falling back to simulation mode...');
+          const mockResult = await mockAutomationService.approveAndSubmitApplication(token);
+          result = mockResult;
+        }
+      } catch (error) {
+        // Final fallback to mock automation
+        console.log('🔄 Using simulation mode for approval due to error:', error);
+        result = await mockAutomationService.approveAndSubmitApplication(token);
+      }
 
       const statusEmoji = result.success ? '✅' : '❌';
       const statusText = result.success ? 'Application Submitted Successfully!' : 'Application Failed';

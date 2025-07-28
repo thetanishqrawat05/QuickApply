@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/home";
 import EnhancedApply from "@/pages/enhanced-apply";
+import AutoApply from "@/pages/auto-apply";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -12,6 +13,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/enhanced-apply" component={EnhancedApply} />
+      <Route path="/auto-apply" component={AutoApply} />
       <Route component={NotFound} />
     </Switch>
   );
