@@ -113,23 +113,47 @@ export class RealApplicationService {
         }
       }
 
-      // Auto-login if credentials provided or detect login requirement
-      if (request.profile.loginEmail && request.profile.loginPassword) {
-        const loginSuccess = await this.autoLoginService.performAutoLogin(page, {
-          email: request.profile.loginEmail,
-          password: request.profile.loginPassword,
-          method: request.profile.preferredLoginMethod || 'email'
-        }, request.jobUrl);
-        
-        if (!loginSuccess) {
-          return {
-            success: false,
-            sessionId,
-            message: 'Login failed. Please check your credentials and try again.'
-          };
+      // Check if login is required and handle appropriately
+      const loginPageDetected = await this.detectLoginRequirement(page);
+      
+      if (loginPageDetected) {
+        if (request.profile.loginEmail && request.profile.loginPassword) {
+          console.log('🔑 Login detected and credentials provided, attempting auto-login...');
+          const loginSuccess = await this.autoLoginService.performAutoLogin(page, {
+            email: request.profile.loginEmail,
+            password: request.profile.loginPassword,
+            method: request.profile.preferredLoginMethod || 'email'
+          }, request.jobUrl);
+          
+          if (!loginSuccess) {
+            return {
+              success: false,
+              sessionId,
+              message: 'Login failed. Please verify your email and password are correct for this job portal.'
+            };
+          }
+          
+          console.log('✅ Auto-login successful, proceeding with application');
+        } else {
+          // Try alternative approaches without login
+          console.log('🔍 Login required but no credentials provided, trying alternatives...');
+          const alternatives = await this.tryAlternativeAccess(page);
+          
+          if (!alternatives.success) {
+            return {
+              success: false,
+              sessionId,
+              message: `❌ This job portal requires login to submit applications. Please provide your login email and password in the form above and try again. 
+
+📧 Use the same email/password you normally use to sign into:
+• Google Careers (use your Google account)
+• LinkedIn Jobs (use your LinkedIn account)  
+• Company career portals (use your account for that company)
+
+🔒 Your credentials are encrypted and secure.`
+            };
+          }
         }
-        
-        console.log('✅ Auto-login successful, proceeding with application');
       }
 
       // Navigate to application form first  
@@ -159,13 +183,22 @@ export class RealApplicationService {
       // Use verified submission result
       const finalSuccess = submissionResult.success && submissionVerified;
       
+      // Prepare form data for session update
+      const filledFormData = {
+        name: request.profile.name,
+        email: request.profile.email,
+        phone: request.profile.phone,
+        jobUrl: request.jobUrl,
+        timestamp: new Date().toISOString()
+      };
+
       // Update session with results
       await storage.updateApplicationSession(sessionId, {
         status: finalSuccess ? 'submitted' : 'failed',
         submissionResult: finalSuccess ? 'success' : 'failed',
         submittedAt: finalSuccess ? new Date() : undefined,
         screenshotPath: confirmationScreenshot,
-        filledFormData: formData,
+        filledFormData,
         errorMessage: submissionResult.error || (!submissionVerified ? 'Submission could not be verified' : undefined)
       });
 
@@ -881,19 +914,215 @@ export class RealApplicationService {
     }
   }
 
+  private async detectLoginRequirement(page: Page): Promise<boolean> {
+    const loginIndicators = [
+      'form[action*="login"]',
+      'form[action*="signin"]',
+      'input[name="password"]',
+      'input[type="password"]',
+      'button:has-text("Sign in")',
+      'button:has-text("Log in")',
+      'a:has-text("Sign in")',
+      '.login-form',
+      '.signin-form',
+      '#login',
+      '#signin'
+    ];
+    
+    for (const selector of loginIndicators) {
+      try {
+        const element = page.locator(selector).first();
+        if (await element.isVisible({ timeout: 1000 })) {
+          return true;
+        }
+      } catch (e) {
+        // Continue checking
+      }
+    }
+    
+    // Check URL patterns
+    const url = page.url().toLowerCase();
+    if (url.includes('login') || url.includes('signin') || url.includes('auth')) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  private async tryAlternativeAccess(page: Page): Promise<{ success: boolean; message?: string }> {
+    // Strategy 1: Look for guest/skip options
+    const guestOptions = [
+      'button:has-text("Continue without account")',
+      'button:has-text("Apply without signing in")',
+      'a:has-text("Continue as guest")',
+      'button:has-text("Skip")',
+      'button:has-text("Apply Now")',
+      '.skip-login',
+      '.guest-apply'
+    ];
+    
+    for (const selector of guestOptions) {
+      try {
+        const element = page.locator(selector).first();
+        if (await element.isVisible({ timeout: 1000 })) {
+          await element.click();
+          console.log('✅ Found guest option, continuing without login');
+          await page.waitForTimeout(2000);
+          return { success: true };
+        }
+      } catch (e) {
+        // Continue checking
+      }
+    }
+    
+    // Strategy 2: Try direct apply buttons
+    const directApplyButtons = [
+      'button:has-text("Apply")',
+      'a:has-text("Apply")',
+      'button:has-text("Apply Now")',
+      '.apply-button'
+    ];
+    
+    for (const selector of directApplyButtons) {
+      try {
+        const element = page.locator(selector).first();
+        if (await element.isVisible({ timeout: 1000 })) {
+          await element.click();
+          await page.waitForTimeout(3000);
+          
+          // Check if we moved to an application form
+          const currentUrl = page.url();
+          if (currentUrl.includes('apply') || currentUrl.includes('application')) {
+            console.log('✅ Successfully navigated to application without login');
+            return { success: true };
+          }
+        }
+      } catch (e) {
+        // Continue checking
+      }
+    }
+    
+    return { 
+      success: false, 
+      message: 'Login credentials required for this job portal'
+    };
+  }
+
   private async handleLoginStep(page: Page, request: RealApplicationRequest): Promise<{ shouldSubmit: boolean; canContinue: boolean }> {
     if (request.profile.loginEmail && request.profile.loginPassword) {
+      console.log('🔑 Attempting login with provided credentials...');
       const success = await this.autoLoginService.performAutoLogin(page, {
         email: request.profile.loginEmail,
         password: request.profile.loginPassword,
         method: request.profile.preferredLoginMethod || 'email'
       }, request.jobUrl);
       
-      return { shouldSubmit: false, canContinue: success };
+      if (success) {
+        console.log('✅ Login successful, continuing with application');
+        // Wait for redirect after login
+        await page.waitForTimeout(3000);
+        return { shouldSubmit: false, canContinue: true };
+      } else {
+        console.log('❌ Login failed with provided credentials');
+        return { shouldSubmit: false, canContinue: false };
+      }
     }
     
-    console.log('❌ No login credentials provided for required login');
-    return { shouldSubmit: false, canContinue: false };
+    // If no credentials provided, try multiple strategies
+    console.log('⚠️ No login credentials provided, trying alternative approaches...');
+    
+    // Strategy 1: Look for guest/skip options
+    const guestOptions = [
+      'button:has-text("Continue without account")',
+      'button:has-text("Apply without signing in")',
+      'a:has-text("Continue as guest")',
+      'button:has-text("Skip")',
+      'button:has-text("Apply Now")',
+      'a:has-text("Apply directly")',
+      '.skip-login',
+      '.guest-apply'
+    ];
+    
+    for (const selector of guestOptions) {
+      try {
+        const element = page.locator(selector).first();
+        if (await element.isVisible({ timeout: 1000 })) {
+          await element.click();
+          console.log('✅ Found guest/skip option, continuing without login');
+          await page.waitForTimeout(2000);
+          return { shouldSubmit: false, canContinue: true };
+        }
+      } catch (e) {
+        // Continue checking
+      }
+    }
+    
+    // Strategy 2: Check if we can find a direct application form on the same page
+    const directFormSelectors = [
+      'form[class*="application"]',
+      'form[class*="apply"]',
+      'form[id*="job-application"]',
+      'input[name*="name"]',
+      'input[name*="email"]',
+      'textarea[name*="cover"]'
+    ];
+    
+    let foundDirectForm = false;
+    for (const selector of directFormSelectors) {
+      try {
+        const element = page.locator(selector).first();
+        if (await element.isVisible({ timeout: 1000 })) {
+          console.log('✅ Found direct application form, bypassing login');
+          foundDirectForm = true;
+          break;
+        }
+      } catch (e) {
+        // Continue checking
+      }
+    }
+    
+    if (foundDirectForm) {
+      return { shouldSubmit: false, canContinue: true };
+    }
+    
+    // Strategy 3: Try to find "Apply" button that might work without login
+    const directApplyButtons = [
+      'button:has-text("Apply")',
+      'a:has-text("Apply")',
+      'button:has-text("Apply Now")',
+      'input[value*="Apply"]',
+      '.apply-button',
+      '.btn-apply'
+    ];
+    
+    for (const selector of directApplyButtons) {
+      try {
+        const element = page.locator(selector).first();
+        if (await element.isVisible({ timeout: 1000 })) {
+          console.log('🔄 Trying direct apply button without login...');
+          await element.click();
+          await page.waitForTimeout(3000);
+          
+          // Check if we moved to an application form
+          const currentUrl = page.url();
+          if (currentUrl.includes('apply') || currentUrl.includes('application')) {
+            console.log('✅ Successfully navigated to application form without login');
+            return { shouldSubmit: false, canContinue: true };
+          }
+        }
+      } catch (e) {
+        // Continue checking
+      }
+    }
+    
+    // Strategy 4: Return helpful error message with guidance
+    console.log('❌ Login appears to be required. Providing guidance to user.');
+    return { 
+      shouldSubmit: false, 
+      canContinue: false,
+      requiresLogin: true,
+      guidance: 'This job portal requires login. Please provide your login credentials in the form and try again.'
+    };
   }
 
   private async fillProfileStep(page: Page, profile: ComprehensiveProfile): Promise<void> {

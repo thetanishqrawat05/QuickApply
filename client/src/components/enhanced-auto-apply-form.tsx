@@ -23,6 +23,7 @@ import {
   CheckCircle, 
   Clock, 
   Globe, 
+  Info,
   Key,
   Mail,
   MessageSquare,
@@ -262,35 +263,50 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
               />
 
               {form.watch('preferredLoginMethod') !== 'manual' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="loginEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Login Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="your-login@email.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <>
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800">
+                      <strong>Required for most job platforms:</strong> Google Careers, LinkedIn Jobs, and company portals typically require login to submit applications.
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="loginEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Login Email *</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="your-login@email.com" {...field} />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">
+                            Same email used for Google/LinkedIn/company accounts
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <FormField
-                    control={form.control}
-                    name="loginPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Login Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="Your password" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                    <FormField
+                      control={form.control}
+                      name="loginPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Login Password *</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Your password" {...field} />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">
+                            Account password (encrypted and secure)
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
