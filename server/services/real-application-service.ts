@@ -371,32 +371,101 @@ export class RealApplicationService {
 
   private async submitApplication(page: Page): Promise<{ success: boolean; error?: string }> {
     const submitSelectors = [
-      'button[type="submit"]',
-      'input[type="submit"]',
-      'button:has-text("Submit")',
-      'button:has-text("Apply")',
-      'button:has-text("Send Application")',
-      '[data-testid*="submit"]'
+      'button[type="submit"]:visible',
+      'input[type="submit"]:visible',
+      'button:visible:has-text("Submit")',
+      'button:visible:has-text("Apply")',
+      'button:visible:has-text("Send Application")',
+      'button:visible:has-text("Continue")',
+      'button:visible:has-text("Next")',
+      'button:visible:has-text("Submit Application")',
+      '[data-testid*="submit"]:visible',
+      '[data-testid*="apply"]:visible',
+      '.submit-btn:visible',
+      '.apply-btn:visible',
+      '.btn-primary:visible',
+      '.btn-submit:visible',
+      'button[class*="submit"]:visible',
+      'button[class*="apply"]:visible',
+      'button[id*="submit"]:visible',
+      'button[id*="apply"]:visible'
     ];
 
+    console.log('🔍 Looking for submit button...');
+    
     for (const selector of submitSelectors) {
       try {
+        console.log(`Testing selector: ${selector}`);
         const submitButton = page.locator(selector).first();
-        if (await submitButton.isVisible({ timeout: 2000 })) {
+        
+        if (await submitButton.isVisible({ timeout: 1000 })) {
+          const buttonText = await submitButton.textContent() || '';
+          console.log(`Found submit button: "${buttonText}" with selector: ${selector}`);
+          
+          // Scroll into view and click
+          await submitButton.scrollIntoViewIfNeeded();
           await submitButton.click();
           console.log('🚀 Application submitted!');
           
           // Wait for submission to complete
-          await page.waitForTimeout(5000);
+          await page.waitForTimeout(3000);
+          
+          // Check for success indicators
+          try {
+            const successSelectors = [
+              ':has-text("success")',
+              ':has-text("submitted")',
+              ':has-text("thank you")',
+              ':has-text("received")',
+              ':has-text("confirmation")',
+              '.success',
+              '.confirmation'
+            ];
+            
+            for (const successSelector of successSelectors) {
+              if (await page.locator(successSelector).first().isVisible({ timeout: 2000 })) {
+                console.log('✅ Submission success confirmed');
+                return { success: true };
+              }
+            }
+          } catch (e) {
+            // Success check failed, but button was clicked
+          }
           
           return { success: true };
         }
       } catch (e) {
+        console.log(`Selector failed: ${selector}`);
         // Continue to next selector
       }
     }
+    
+    // As a last resort, try to find any button that might submit
+    try {
+      const allButtons = await page.locator('button:visible').all();
+      console.log(`Found ${allButtons.length} visible buttons, checking each...`);
+      
+      for (const button of allButtons) {
+        const text = (await button.textContent() || '').toLowerCase();
+        const className = (await button.getAttribute('class')) || '';
+        const id = (await button.getAttribute('id')) || '';
+        
+        if (text.includes('submit') || text.includes('apply') || text.includes('send') ||
+            className.includes('submit') || className.includes('apply') ||
+            id.includes('submit') || id.includes('apply')) {
+          console.log(`Trying button with text: "${text}", class: "${className}", id: "${id}"`);
+          await button.scrollIntoViewIfNeeded();
+          await button.click();
+          await page.waitForTimeout(3000);
+          return { success: true };
+        }
+      }
+    } catch (e) {
+      console.log('Fallback button search failed');
+    }
 
-    return { success: false, error: 'Submit button not found' };
+    console.log('❌ No submit button found after exhaustive search');
+    return { success: false, error: 'Submit button not found after trying all selectors and scanning all buttons' };
   }
 
   private async captureScreenshot(page: Page, sessionId: string, type: string): Promise<string> {

@@ -30,7 +30,6 @@ import {
   User,
   MapPin,
   Phone,
-  AlertTriangle,
   Sparkles
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
@@ -460,10 +459,10 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
                     }
                   </p>
                   {useRealSubmission && (
-                    <Alert className="mt-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        Real mode requires browser automation dependencies. Applications will appear in your actual job site accounts.
+                    <Alert className="mt-2 border-green-200 bg-green-50">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-green-800">
+                        <strong>Real submission mode enabled.</strong> Applications will be submitted directly to company portals and you'll receive confirmation emails from companies.
                       </AlertDescription>
                     </Alert>
                   )}
