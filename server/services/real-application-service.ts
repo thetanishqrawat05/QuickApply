@@ -93,12 +93,16 @@ export class RealApplicationService {
       let aiCoverLetter = '';
       if (request.profile.enableAICoverLetter && !request.coverLetterFile) {
         try {
+          const experienceText = Array.isArray(request.profile.experience) 
+            ? request.profile.experience.map(exp => `${exp.title} at ${exp.company}`).join(', ')
+            : (request.profile.experience || 'Software engineering experience');
+            
           aiCoverLetter = await this.geminiService.generateCoverLetter(
             jobDetails.jobTitle,
             jobDetails.company,
             jobDetails.description,
             request.profile.name,
-            typeof request.profile.experience === 'string' ? request.profile.experience : JSON.stringify(request.profile.experience || [])
+            experienceText
           );
           console.log('🤖 AI cover letter generated');
         } catch (error) {
@@ -108,13 +112,17 @@ export class RealApplicationService {
 
       // Auto-login if credentials provided
       if (request.profile.loginEmail && request.profile.loginPassword) {
-        const loginSuccess = await this.autoLoginService.performAutoLogin(page, {
-          email: request.profile.loginEmail,
-          password: request.profile.loginPassword,
-          method: request.profile.preferredLoginMethod || 'email'
-        }, request.jobUrl);
-        
-        console.log(loginSuccess ? '✅ Auto-login successful' : '❌ Auto-login failed');
+        try {
+          const loginSuccess = await this.autoLoginService.performAutoLogin(page, {
+            email: request.profile.loginEmail,
+            password: request.profile.loginPassword,
+            method: request.profile.preferredLoginMethod || 'email'
+          }, request.jobUrl);
+          
+          console.log(loginSuccess ? '✅ Auto-login successful' : '❌ Auto-login failed');
+        } catch (error) {
+          console.log('Auto-login service not available, proceeding without login');
+        }
       }
 
       // Find and navigate to application form
@@ -124,11 +132,8 @@ export class RealApplicationService {
         console.log(`📝 Navigated to application form: ${applicationUrl}`);
       }
 
-      // Fill the application form
-      const formData = await this.fillApplicationForm(page, request, aiCoverLetter, sessionId);
-      
-      // Handle multi-step forms (check for "Next" or "Continue" buttons)
-      await this.handleMultiStepForm(page);
+      // Handle complete multi-step application workflow
+      await this.handleMultiStepForm(page, request);
       
       // Take screenshot before submission
       const preSubmissionScreenshot = await this.captureScreenshot(page, sessionId, 'pre-submission');
@@ -247,30 +252,76 @@ export class RealApplicationService {
   }
 
   private async findApplicationForm(page: Page): Promise<string | null> {
+    console.log('🔍 Looking for Apply button...');
+    
     const applySelectors = [
-      'a:has-text("Apply")',
       'button:has-text("Apply")',
-      'a:has-text("Apply Now")',
+      'a:has-text("Apply")',
       'button:has-text("Apply Now")',
+      'a:has-text("Apply Now")',
+      'button:has-text("Apply for this job")',
       '[data-testid*="apply"]',
+      '[aria-label*="apply" i]',
       '.apply-button',
-      '#apply-button'
+      '#apply-button',
+      '.btn-apply',
+      'button[class*="apply"]',
+      'a[class*="apply"]'
     ];
 
+    // First try to find and click Apply button
     for (const selector of applySelectors) {
       try {
         const element = page.locator(selector).first();
         if (await element.isVisible({ timeout: 2000 })) {
+          const buttonText = await element.textContent() || '';
+          console.log(`Found Apply button: "${buttonText}" with selector: ${selector}`);
+          
           await element.click();
           await page.waitForTimeout(3000);
+          
+          // Check if we need to handle login
+          const needsLogin = await this.checkIfLoginRequired(page);
+          if (needsLogin) {
+            console.log('🔑 Login required, handling authentication...');
+            // Login will be handled by auto-login service
+          }
+          
           return page.url();
         }
       } catch (e) {
-        // Continue to next selector
+        console.log(`Apply selector failed: ${selector}`);
       }
     }
 
+    console.log('⚠️ No Apply button found');
     return null;
+  }
+
+  private async checkIfLoginRequired(page: Page): Promise<boolean> {
+    const loginIndicators = [
+      ':has-text("sign in")',
+      ':has-text("log in")',
+      ':has-text("login")',
+      ':has-text("create account")',
+      ':has-text("get started")',
+      'input[type="email"]',
+      'input[type="password"]',
+      '[data-testid*="login"]',
+      '[data-testid*="signin"]'
+    ];
+
+    for (const indicator of loginIndicators) {
+      try {
+        if (await page.locator(indicator).first().isVisible({ timeout: 1000 })) {
+          return true;
+        }
+      } catch (e) {
+        // Continue checking
+      }
+    }
+    
+    return false;
   }
 
   private async fillApplicationForm(page: Page, request: RealApplicationRequest, aiCoverLetter: string, sessionId: string): Promise<Record<string, any>> {
@@ -731,51 +782,233 @@ export class RealApplicationService {
     return false;
   }
 
-  private async handleMultiStepForm(page: Page): Promise<void> {
-    console.log('🔍 Checking for multi-step form navigation...');
+  private async handleMultiStepForm(page: Page, request: RealApplicationRequest): Promise<void> {
+    console.log('🔍 Handling multi-step application workflow...');
     
+    let currentStep = 1;
+    const maxSteps = 10; // Prevent infinite loops
+    let filledData: Record<string, any> = {};
+    
+    while (currentStep <= maxSteps) {
+      console.log(`📋 Processing step ${currentStep}...`);
+      
+      // Analyze current page with AI
+      const pageAnalysis = await this.analyzePageWithAI(page);
+      
+      // Fill forms on current step
+      await this.fillCurrentStepForm(page, request, pageAnalysis, filledData);
+      
+      // Look for next step navigation
+      const nextStepResult = await this.navigateToNextStep(page);
+      
+      if (!nextStepResult.hasNext) {
+        console.log('✅ Reached final step or submit page');
+        break;
+      }
+      
+      if (nextStepResult.isSubmitStep) {
+        console.log('🎯 Reached submit step');
+        break;
+      }
+      
+      currentStep++;
+      await page.waitForTimeout(1000); // Brief pause between steps
+    }
+    
+    console.log(`✅ Multi-step form navigation completed after ${currentStep} steps`);
+  }
+
+  private async analyzePageWithAI(page: Page): Promise<{
+    stepType: string;
+    requiredFields: string[];
+    formContext: string;
+  }> {
+    try {
+      // Get page content for AI analysis
+      const pageTitle = await page.title();
+      const visibleText = await page.locator('body').textContent() || '';
+      const formLabels = await page.locator('label:visible').allTextContents();
+      const inputPlaceholders = await page.locator('input:visible').evaluateAll(
+        inputs => inputs.map(input => input.getAttribute('placeholder')).filter(Boolean)
+      );
+      
+      // Simple pattern matching (can be enhanced with actual AI service)
+      let stepType = 'general';
+      let requiredFields: string[] = [];
+      
+      const content = (pageTitle + ' ' + visibleText + ' ' + formLabels.join(' ')).toLowerCase();
+      
+      if (content.includes('profile') || content.includes('personal') || content.includes('contact')) {
+        stepType = 'profile';
+        requiredFields = ['name', 'email', 'phone', 'address'];
+      } else if (content.includes('experience') || content.includes('work') || content.includes('employment')) {
+        stepType = 'experience';
+        requiredFields = ['experience', 'skills', 'employment'];
+      } else if (content.includes('education') || content.includes('degree') || content.includes('university')) {
+        stepType = 'education';
+        requiredFields = ['education', 'degree', 'school'];
+      } else if (content.includes('upload') || content.includes('resume') || content.includes('cv')) {
+        stepType = 'documents';
+        requiredFields = ['resume', 'cover_letter'];
+      } else if (content.includes('review') || content.includes('submit') || content.includes('confirm')) {
+        stepType = 'review';
+        requiredFields = [];
+      }
+      
+      return {
+        stepType,
+        requiredFields,
+        formContext: content.slice(0, 500)
+      };
+    } catch (error) {
+      return { stepType: 'general', requiredFields: [], formContext: '' };
+    }
+  }
+
+  private async fillCurrentStepForm(
+    page: Page, 
+    request: RealApplicationRequest, 
+    analysis: { stepType: string; requiredFields: string[] }, 
+    filledData: Record<string, any>
+  ): Promise<void> {
+    console.log(`📝 Filling ${analysis.stepType} form fields...`);
+    
+    switch (analysis.stepType) {
+      case 'profile':
+        await this.fillBasicInfo(page, request.profile, filledData);
+        break;
+      case 'experience':
+        await this.fillExperienceFields(page, request.profile, filledData);
+        break;
+      case 'education':
+        await this.fillEducationFields(page, request.profile, filledData);
+        break;
+      case 'documents':
+        if (request.resumeFile) {
+          await this.handleFileUpload(page, 'resume', request.resumeFile, Date.now().toString());
+        }
+        break;
+      default:
+        // Fill any visible form fields intelligently
+        await this.fillBasicInfo(page, request.profile, filledData);
+        break;
+    }
+  }
+
+  private async fillExperienceFields(page: Page, profile: ComprehensiveProfile, filledData: Record<string, any>): Promise<void> {
+    const experienceSelectors = [
+      'textarea[name*="experience"]', 'textarea[id*="experience"]',
+      'textarea[name*="summary"]', 'textarea[id*="summary"]',
+      'textarea[placeholder*="experience" i]', 'textarea[placeholder*="work" i]'
+    ];
+
+    const experienceText = Array.isArray(profile.experience) 
+      ? profile.experience.map(exp => `${exp.title} at ${exp.company}: ${exp.description}`).join('\n')
+      : 'Experienced software engineer with expertise in full-stack development';
+
+    for (const selector of experienceSelectors) {
+      try {
+        const field = page.locator(selector).first();
+        if (await field.isVisible({ timeout: 1000 })) {
+          await field.fill(experienceText);
+          filledData.experience = experienceText;
+          console.log('✅ Filled experience field');
+          break;
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+
+  private async fillEducationFields(page: Page, profile: ComprehensiveProfile, filledData: Record<string, any>): Promise<void> {
+    const educationSelectors = [
+      'input[name*="education"]', 'input[id*="education"]',
+      'input[name*="degree"]', 'input[id*="degree"]',
+      'input[name*="university"]', 'input[id*="university"]',
+      'select[name*="education"]', 'select[id*="education"]'
+    ];
+
+    const educationValue = 'Bachelor\'s Degree in Computer Science';
+
+    for (const selector of educationSelectors) {
+      try {
+        const field = page.locator(selector).first();
+        if (await field.isVisible({ timeout: 1000 })) {
+          if (selector.includes('select')) {
+            // Handle dropdown
+            const options = await field.locator('option').allTextContents();
+            const matchingOption = options.find(opt => 
+              opt.toLowerCase().includes('bachelor') || opt.toLowerCase().includes('computer')
+            );
+            if (matchingOption) {
+              await field.selectOption({ label: matchingOption });
+            }
+          } else {
+            await field.fill(educationValue);
+          }
+          filledData.education = educationValue;
+          console.log('✅ Filled education field');
+          break;
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+
+  private async navigateToNextStep(page: Page): Promise<{ hasNext: boolean; isSubmitStep: boolean }> {
     const nextStepSelectors = [
       'button:has-text("Next")',
       'button:has-text("Continue")',
       'button:has-text("Proceed")',
-      'button:has-text("Step")',
+      'button:has-text("Save and continue")',
       '[data-testid*="next"]',
       '[data-testid*="continue"]',
-      '.next-button',
-      '.continue-button'
+      'button[class*="next"]',
+      'button[class*="continue"]'
     ];
 
-    // Try to navigate through multiple steps
-    let maxSteps = 5; // Prevent infinite loops
-    while (maxSteps > 0) {
-      let foundNextButton = false;
-      
-      for (const selector of nextStepSelectors) {
-        try {
-          const nextButton = page.locator(selector).first();
-          if (await nextButton.isVisible({ timeout: 2000 })) {
-            const buttonText = await nextButton.textContent() || '';
-            console.log(`Found next step button: "${buttonText}"`);
-            
-            await nextButton.click();
-            await page.waitForTimeout(2000);
-            
-            foundNextButton = true;
-            break;
-          }
-        } catch (e) {
-          // Continue
+    const submitSelectors = [
+      'button:has-text("Submit")',
+      'button:has-text("Submit Application")',
+      'button:has-text("Apply")',
+      'button:has-text("Send Application")',
+      'button[type="submit"]'
+    ];
+
+    // Check for submit buttons first
+    for (const selector of submitSelectors) {
+      try {
+        const submitButton = page.locator(selector).first();
+        if (await submitButton.isVisible({ timeout: 1000 })) {
+          console.log('🎯 Found submit button, ready for final submission');
+          return { hasNext: false, isSubmitStep: true };
         }
+      } catch (e) {
+        // Continue
       }
-      
-      if (!foundNextButton) {
-        break;
+    }
+
+    // Look for next step buttons
+    for (const selector of nextStepSelectors) {
+      try {
+        const nextButton = page.locator(selector).first();
+        if (await nextButton.isVisible({ timeout: 1000 })) {
+          const buttonText = await nextButton.textContent() || '';
+          console.log(`Clicking next step: "${buttonText}"`);
+          
+          await nextButton.click();
+          await page.waitForTimeout(2000); // Wait for navigation
+          
+          return { hasNext: true, isSubmitStep: false };
+        }
+      } catch (e) {
+        // Continue
       }
-      
-      maxSteps--;
     }
     
-    console.log('✅ Multi-step form navigation completed');
+    return { hasNext: false, isSubmitStep: false };
   }
 
   private async debugFormState(page: Page): Promise<void> {

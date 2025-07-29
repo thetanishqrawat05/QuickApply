@@ -59,6 +59,12 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
       enableAICoverLetter: true,
       enableWhatsappNotifications: false,
       preferredLoginMethod: 'email',
+      loginEmail: '',
+      loginPassword: '',
+      resumeFileName: '',
+      coverLetterFileName: '',
+      experience: [],
+      customResponses: {}
     }
   });
 
