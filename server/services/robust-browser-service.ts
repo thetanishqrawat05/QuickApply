@@ -109,9 +109,27 @@ export class RobustBrowserService {
 
   async isAvailable(): Promise<boolean> {
     try {
-      await this.launchBrowser();
+      // Quick test - try to launch and immediately close browser
+      console.log('🔍 Testing browser availability...');
+      const browser = await chromium.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu'
+        ],
+        chromiumSandbox: false,
+        timeout: 15000
+      });
+      
+      console.log('✅ Browser launched for availability test');
+      await browser.close();
+      console.log('✅ Browser availability check passed - automation is ready');
       return true;
     } catch (error) {
+      console.log('❌ Browser availability check failed:', (error as Error).message);
+      console.log('This will cause the application to fall back to simulation mode');
       return false;
     }
   }

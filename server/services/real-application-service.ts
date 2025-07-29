@@ -186,6 +186,15 @@ export class RealApplicationService {
     }
   }
 
+  async testBrowserAvailability(): Promise<boolean> {
+    try {
+      return await this.browserService.isAvailable();
+    } catch (error) {
+      console.log('Browser availability test failed:', (error as Error).message);
+      return false;
+    }
+  }
+
   private detectPlatform(url: string): string {
     if (url.includes('greenhouse')) return 'Greenhouse';
     if (url.includes('lever')) return 'Lever';

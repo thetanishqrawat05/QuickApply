@@ -463,6 +463,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  // Browser availability test
+  app.get("/api/test-browser", async (req, res) => {
+    try {
+      const browserAvailable = await realApplicationService.testBrowserAvailability();
+      res.json({ 
+        browserAvailable, 
+        message: browserAvailable ? "Browser automation is available" : "Browser automation not available - falling back to simulation mode"
+      });
+    } catch (error) {
+      res.json({ 
+        browserAvailable: false, 
+        message: "Browser test failed",
+        error: (error as Error).message
+      });
+    }
+  });
+
   // Enhanced job application with email approval workflow
   app.post("/api/start-application", upload.fields([
     { name: 'resume', maxCount: 1 },
