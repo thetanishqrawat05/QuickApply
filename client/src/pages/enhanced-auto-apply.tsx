@@ -68,7 +68,21 @@ export default function EnhancedAutoApplyPage() {
               <Camera className="h-3 w-3" />
               Screenshot Capture
             </Badge>
+            <Badge variant="destructive" className="flex items-center gap-1">
+              <Globe className="h-3 w-3" />
+              REAL SUBMISSION MODE
+            </Badge>
           </div>
+          
+          {/* NEW: Real Application Notice */}
+          <Alert className="max-w-4xl mx-auto mb-6 border-orange-200 bg-orange-50">
+            <AlertTriangle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              <strong>🎉 NEW: Real Application Mode Available!</strong> After entering a job URL below, you can now toggle between 
+              simulation mode (email review) and <strong>REAL application submission</strong> that actually submits to company portals. 
+              You'll receive confirmation emails from companies and see applications in your job site accounts.
+            </AlertDescription>
+          </Alert>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -173,6 +187,12 @@ export default function EnhancedAutoApplyPage() {
                         <p className="text-sm text-muted-foreground mt-1">
                           Supports: Greenhouse, Lever, Workday, BambooHR, SmartRecruiters, and company career sites
                         </p>
+                        <Alert className="mt-3 border-blue-200 bg-blue-50">
+                          <Globe className="h-4 w-4 text-blue-600" />
+                          <AlertDescription className="text-blue-800">
+                            <strong>Ready for Real Applications:</strong> Once you enter a URL, you'll see the new "Real Application Submission" toggle in the form below!
+                          </AlertDescription>
+                        </Alert>
                       </div>
                     </div>
                   </CardContent>
