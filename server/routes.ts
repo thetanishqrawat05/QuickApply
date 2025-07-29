@@ -7,6 +7,7 @@ import { EnhancedAutomationService } from "./services/enhanced-automation";
 import { MockAutomationService } from "./services/mock-automation";
 import { AutoApplyWorkflowService } from "./services/auto-apply-workflow";
 import { EnhancedAutoApplyWorkflowService } from "./services/enhanced-auto-apply-workflow";
+import { RealApplicationService } from "./services/real-application-service";
 import { storage } from "./storage";
 
 const upload = multer({
@@ -30,6 +31,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const mockAutomationService = new MockAutomationService();
   const autoApplyWorkflowService = new AutoApplyWorkflowService();
   const enhancedAutoApplyWorkflowService = new EnhancedAutoApplyWorkflowService();
+  const realApplicationService = new RealApplicationService();
 
   // User management routes
   app.post("/api/users", async (req, res) => {
@@ -394,6 +396,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Manual approval error:", error);
       res.status(500).json({ 
         message: "Failed to approve application",
+        errorDetails: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Real Application Submission (actual job portal automation)
+  app.post("/api/real-apply", upload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'coverLetter', maxCount: 1 }
+  ]), async (req, res) => {
+    try {
+      const { jobUrl, profile } = req.body;
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      // Parse profile data
+      let parsedProfile;
+      try {
+        parsedProfile = typeof profile === 'string' ? JSON.parse(profile) : profile;
+      } catch (error) {
+        return res.status(400).json({ message: "Invalid profile data format" });
+      }
+
+      // Validate comprehensive profile
+      const validationResult = comprehensiveProfileSchema.safeParse(parsedProfile);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid profile data",
+          errors: validationResult.error.errors
+        });
+      }
+
+      if (!jobUrl || typeof jobUrl !== 'string') {
+        return res.status(400).json({ message: "Valid job URL is required" });
+      }
+
+      const resumeFile = files?.resume?.[0];
+      if (!resumeFile) {
+        return res.status(400).json({ message: "Resume file is required" });
+      }
+
+      const coverLetterFile = files?.coverLetter?.[0];
+      
+      console.log(`🚀 Starting REAL application submission to: ${jobUrl}`);
+      
+      // Submit real application
+      const result = await realApplicationService.submitRealApplication({
+        jobUrl,
+        profile: validationResult.data,
+        resumeFile: resumeFile.buffer,
+        coverLetterFile: coverLetterFile?.buffer
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Real application submission error:", error);
+      res.status(500).json({ 
+        message: "Failed to submit real application",
         errorDetails: error instanceof Error ? error.message : "Unknown error"
       });
     }

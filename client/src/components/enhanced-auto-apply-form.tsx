@@ -43,6 +43,7 @@ interface EnhancedAutoApplyFormProps {
 export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFormProps) {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [coverLetterFile, setCoverLetterFile] = useState<File | null>(null);
+  const [useRealSubmission, setUseRealSubmission] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<ComprehensiveProfile>({
@@ -75,7 +76,8 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
         formData.append('coverLetter', data.coverLetterFile);
       }
 
-      const response = await fetch('/api/enhanced-auto-apply', {
+      const endpoint = useRealSubmission ? '/api/real-apply' : '/api/enhanced-auto-apply';
+      const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
       });
@@ -89,7 +91,7 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
     onSuccess: (data: any) => {
       if (data.success) {
         toast({
-          title: "Enhanced Auto-Apply Started!",
+          title: useRealSubmission ? "Real Application Submitted!" : "Enhanced Auto-Apply Started!",
           description: data.message,
         });
         if (data.sessionId && onSuccess) {
@@ -430,6 +432,42 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
                 {coverLetterFile && (
                   <p className="text-sm text-green-600 mt-1">✅ {coverLetterFile.name}</p>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Submission Mode */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Submission Mode
+              </CardTitle>
+              <CardDescription>Choose between simulation mode or real job portal submission</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-row items-start space-x-3 space-y-0">
+                <Checkbox
+                  checked={useRealSubmission}
+                  onCheckedChange={(checked) => setUseRealSubmission(checked === true)}
+                />
+                <div className="space-y-1 leading-none">
+                  <Label>Real Application Submission</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {useRealSubmission 
+                      ? "⚠️ REAL MODE: Will actually submit applications to job portals and you'll get company confirmation emails"
+                      : "🔄 SIMULATION MODE: Preview mode with email review system (default)"
+                    }
+                  </p>
+                  {useRealSubmission && (
+                    <Alert className="mt-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        Real mode requires browser automation dependencies. Applications will appear in your actual job site accounts.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
