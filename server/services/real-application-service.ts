@@ -127,23 +127,35 @@ export class RealApplicationService {
       // Fill the application form
       const formData = await this.fillApplicationForm(page, request, aiCoverLetter, sessionId);
       
+      // Handle multi-step forms (check for "Next" or "Continue" buttons)
+      await this.handleMultiStepForm(page);
+      
       // Take screenshot before submission
       const preSubmissionScreenshot = await this.captureScreenshot(page, sessionId, 'pre-submission');
       
       // Submit the application
       const submissionResult = await this.submitApplication(page);
       
+      // Wait for submission to process and check for confirmation
+      await page.waitForTimeout(3000);
+      
+      // Verify submission was successful
+      const submissionVerified = await this.verifySubmissionSuccess(page);
+      
       // Take screenshot after submission
       const confirmationScreenshot = await this.captureScreenshot(page, sessionId, 'confirmation');
       
+      // Use verified submission result
+      const finalSuccess = submissionResult.success && submissionVerified;
+      
       // Update session with results
       await storage.updateApplicationSession(sessionId, {
-        status: submissionResult.success ? 'submitted' : 'failed',
-        submissionResult: submissionResult.success ? 'success' : 'failed',
-        submittedAt: submissionResult.success ? new Date() : undefined,
+        status: finalSuccess ? 'submitted' : 'failed',
+        submissionResult: finalSuccess ? 'success' : 'failed',
+        submittedAt: finalSuccess ? new Date() : undefined,
         screenshotPath: confirmationScreenshot,
         filledFormData: formData,
-        errorMessage: submissionResult.error
+        errorMessage: submissionResult.error || (!submissionVerified ? 'Submission could not be verified' : undefined)
       });
 
       // Log the application
@@ -153,19 +165,21 @@ export class RealApplicationService {
         jobTitle: jobDetails.jobTitle,
         companyName: jobDetails.company,
         jobUrl: request.jobUrl,
-        result: submissionResult.success ? 'success' : 'failed',
-        notes: submissionResult.success ? 'Application submitted successfully' : `Submission failed: ${submissionResult.error}`
+        result: finalSuccess ? 'success' : 'failed',
+        notes: finalSuccess 
+          ? 'Application submitted successfully and verified' 
+          : `Submission failed: ${submissionResult.error || 'Could not verify submission'}`
       });
 
       // Send confirmation email
-      await this.emailService.sendConfirmationEmail(session, submissionResult.success);
+      await this.emailService.sendConfirmationEmail(session, finalSuccess);
 
       return {
-        success: submissionResult.success,
+        success: finalSuccess,
         sessionId,
-        message: submissionResult.success 
-          ? `Application submitted successfully to ${jobDetails.company}! You should receive a confirmation email from them soon.`
-          : `Application submission failed: ${submissionResult.error}`,
+        message: finalSuccess 
+          ? `✅ Application submitted successfully to ${jobDetails.company}! The submission was verified and you should receive a confirmation email from them soon. Check your ${jobDetails.company} account to see the application.`
+          : `❌ Application submission failed: ${submissionResult.error || 'Could not verify submission completed successfully'}`,
         confirmationScreenshot
       };
 
@@ -268,14 +282,20 @@ export class RealApplicationService {
       
       // Handle file uploads
       if (request.resumeFile) {
-        await this.handleFileUpload(page, 'resume', request.resumeFile, sessionId);
-        filledData.resumeUploaded = true;
+        const resumeUploaded = await this.handleFileUpload(page, 'resume', request.resumeFile, sessionId);
+        filledData.resumeUploaded = resumeUploaded;
+        if (!resumeUploaded) {
+          console.log('⚠️ Resume upload failed, but continuing with application');
+        }
       }
       
       if (request.coverLetterFile || aiCoverLetter) {
         const coverLetterBuffer = request.coverLetterFile || Buffer.from(aiCoverLetter);
-        await this.handleFileUpload(page, 'cover-letter', coverLetterBuffer, sessionId);
-        filledData.coverLetterUploaded = true;
+        const coverLetterUploaded = await this.handleFileUpload(page, 'cover-letter', coverLetterBuffer, sessionId);
+        filledData.coverLetterUploaded = coverLetterUploaded;
+        if (!coverLetterUploaded) {
+          console.log('⚠️ Cover letter upload failed, but continuing with application');
+        }
       }
 
       // Fill custom responses
@@ -283,6 +303,9 @@ export class RealApplicationService {
         await this.fillCustomResponses(page, request.profile.customResponses, filledData);
       }
 
+      // Debug form state after filling
+      await this.debugFormState(page);
+      
       console.log('✅ Application form filled successfully');
       return filledData;
 
@@ -294,26 +317,157 @@ export class RealApplicationService {
 
   private async fillBasicInfo(page: Page, profile: ComprehensiveProfile, filledData: Record<string, any>) {
     const fieldMappings = [
-      { selectors: ['input[name*="firstName"]', 'input[id*="first"]', 'input[placeholder*="First" i]'], value: profile.name.split(' ')[0], key: 'firstName' },
-      { selectors: ['input[name*="lastName"]', 'input[id*="last"]', 'input[placeholder*="Last" i]'], value: profile.name.split(' ').slice(1).join(' '), key: 'lastName' },
-      { selectors: ['input[name*="name"]', 'input[id*="name"]', 'input[placeholder*="Full Name" i]'], value: profile.name, key: 'fullName' },
-      { selectors: ['input[type="email"]', 'input[name*="email"]'], value: profile.email, key: 'email' },
-      { selectors: ['input[type="tel"]', 'input[name*="phone"]', 'input[placeholder*="phone" i]'], value: profile.phone, key: 'phone' },
+      { 
+        selectors: [
+          'input[name*="firstName"]', 'input[id*="first"]', 'input[placeholder*="First" i]',
+          'input[name*="first_name"]', 'input[id*="first_name"]', 'input[aria-label*="first" i]'
+        ], 
+        value: profile.name.split(' ')[0], 
+        key: 'firstName' 
+      },
+      { 
+        selectors: [
+          'input[name*="lastName"]', 'input[id*="last"]', 'input[placeholder*="Last" i]',
+          'input[name*="last_name"]', 'input[id*="last_name"]', 'input[aria-label*="last" i]'
+        ], 
+        value: profile.name.split(' ').slice(1).join(' '), 
+        key: 'lastName' 
+      },
+      { 
+        selectors: [
+          'input[name*="name"]:not([name*="first"]):not([name*="last"])', 
+          'input[id*="name"]:not([id*="first"]):not([id*="last"])', 
+          'input[placeholder*="Full Name" i]', 'input[aria-label*="full name" i]'
+        ], 
+        value: profile.name, 
+        key: 'fullName' 
+      },
+      { 
+        selectors: [
+          'input[type="email"]', 'input[name*="email"]', 'input[id*="email"]',
+          'input[placeholder*="email" i]', 'input[aria-label*="email" i]'
+        ], 
+        value: profile.email, 
+        key: 'email' 
+      },
+      { 
+        selectors: [
+          'input[type="tel"]', 'input[name*="phone"]', 'input[id*="phone"]',
+          'input[placeholder*="phone" i]', 'input[aria-label*="phone" i]',
+          'input[name*="mobile"]', 'input[id*="mobile"]'
+        ], 
+        value: profile.phone, 
+        key: 'phone' 
+      },
+      { 
+        selectors: [
+          'input[name*="address"]', 'input[id*="address"]', 'textarea[name*="address"]',
+          'input[placeholder*="address" i]', 'input[aria-label*="address" i]'
+        ], 
+        value: profile.address || '', 
+        key: 'address' 
+      },
+      { 
+        selectors: [
+          'input[name*="city"]', 'input[id*="city"]',
+          'input[placeholder*="city" i]', 'input[aria-label*="city" i]'
+        ], 
+        value: profile.city || '', 
+        key: 'city' 
+      },
+      { 
+        selectors: [
+          'input[name*="state"]', 'input[id*="state"]', 'select[name*="state"]',
+          'input[placeholder*="state" i]', 'input[aria-label*="state" i]'
+        ], 
+        value: profile.state || '', 
+        key: 'state' 
+      },
+      { 
+        selectors: [
+          'input[name*="zip"]', 'input[id*="zip"]', 'input[name*="postal"]',
+          'input[placeholder*="zip" i]', 'input[placeholder*="postal" i]'
+        ], 
+        value: profile.zipCode || '', 
+        key: 'zipCode' 
+      }
     ];
 
+    console.log(`🔍 Scanning for form fields on page...`);
+    
+    // Wait for form to load
+    await page.waitForTimeout(2000);
+
     for (const mapping of fieldMappings) {
+      let filled = false;
       for (const selector of mapping.selectors) {
         try {
           const field = page.locator(selector).first();
-          if (await field.isVisible({ timeout: 1000 })) {
+          if (await field.isVisible({ timeout: 1000 }) && await field.isEnabled()) {
+            // Clear field first
+            await field.clear();
+            // Fill with value
             await field.fill(mapping.value);
-            filledData[mapping.key] = mapping.value;
-            console.log(`✅ Filled ${mapping.key}`);
-            break;
+            // Verify the value was entered
+            const currentValue = await field.inputValue();
+            if (currentValue === mapping.value) {
+              filledData[mapping.key] = mapping.value;
+              console.log(`✅ Successfully filled ${mapping.key}: ${mapping.value}`);
+              filled = true;
+              break;
+            }
           }
         } catch (e) {
           // Continue to next selector
         }
+      }
+      
+      if (!filled && mapping.value) {
+        console.log(`⚠️ Could not fill ${mapping.key}: ${mapping.value}`);
+      }
+    }
+
+    // Handle work authorization dropdown
+    if (profile.workAuthorization) {
+      await this.handleWorkAuthorizationDropdown(page, profile.workAuthorization, filledData);
+    }
+
+    // Wait for any dynamic form updates
+    await page.waitForTimeout(1000);
+  }
+
+  private async handleWorkAuthorizationDropdown(page: Page, workAuth: string, filledData: Record<string, any>) {
+    const workAuthSelectors = [
+      'select[name*="work"]', 'select[id*="work"]', 'select[name*="authorization"]',
+      'select[name*="visa"]', 'select[id*="visa"]', 'select[name*="eligibility"]'
+    ];
+
+    const workAuthValues = {
+      'citizen': ['US Citizen', 'Citizen', 'Yes', 'Authorized', 'No sponsorship required'],
+      'permanent_resident': ['Permanent Resident', 'Green Card', 'LPR', 'Yes', 'Authorized'],
+      'visa_required': ['Visa Required', 'Need Sponsorship', 'F1', 'H1B', 'No', 'Requires Sponsorship'],
+      'other': ['Other', 'Will provide details']
+    };
+
+    for (const selector of workAuthSelectors) {
+      try {
+        const select = page.locator(selector).first();
+        if (await select.isVisible({ timeout: 1000 })) {
+          const options = await select.locator('option').all();
+          for (const option of options) {
+            const optionText = await option.textContent() || '';
+            const matchingValues = workAuthValues[workAuth as keyof typeof workAuthValues] || [];
+            
+            if (matchingValues.some(val => optionText.includes(val))) {
+              await select.selectOption({ label: optionText });
+              filledData.workAuthorization = optionText;
+              console.log(`✅ Selected work authorization: ${optionText}`);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        // Continue
       }
     }
   }
@@ -322,25 +476,77 @@ export class RealApplicationService {
     const uploadSelectors = [
       `input[type="file"][name*="${fileType}"]`,
       `input[type="file"][id*="${fileType}"]`,
-      'input[type="file"]'
+      `input[type="file"][aria-label*="${fileType}" i]`,
+      `input[type="file"][placeholder*="${fileType}" i]`,
+      'input[type="file"][name*="resume"]',
+      'input[type="file"][name*="cv"]',
+      'input[type="file"][name*="document"]',
+      'input[type="file"][name*="upload"]',
+      'input[type="file"]' // Fallback to any file input
     ];
 
-    // Save file temporarily
+    // Save file temporarily with proper extension
     const tempDir = path.join(process.cwd(), 'temp');
     await fs.mkdir(tempDir, { recursive: true });
-    const tempFilePath = path.join(tempDir, `${fileType}_${sessionId}.pdf`);
+    const fileExtension = fileType === 'resume' ? '.pdf' : '.pdf';
+    const tempFilePath = path.join(tempDir, `${fileType}_${sessionId}${fileExtension}`);
     await fs.writeFile(tempFilePath, fileBuffer);
+
+    console.log(`🔍 Looking for ${fileType} upload field...`);
 
     for (const selector of uploadSelectors) {
       try {
         const fileInput = page.locator(selector).first();
         if (await fileInput.isVisible({ timeout: 2000 })) {
-          await fileInput.setInputFiles(tempFilePath);
-          console.log(`✅ Uploaded ${fileType}`);
+          console.log(`Found file input with selector: ${selector}`);
           
-          // Cleanup temp file
-          setTimeout(() => fs.unlink(tempFilePath).catch(console.error), 5000);
-          return;
+          // Upload the file
+          await fileInput.setInputFiles(tempFilePath);
+          
+          // Wait for upload to process
+          await page.waitForTimeout(2000);
+          
+          // Verify upload was successful
+          const inputValue = await fileInput.inputValue();
+          if (inputValue && inputValue.includes(fileType)) {
+            console.log(`✅ Successfully uploaded ${fileType}: ${inputValue}`);
+            
+            // Cleanup temp file after successful upload
+            setTimeout(() => fs.unlink(tempFilePath).catch(console.error), 5000);
+            return true;
+          }
+        }
+      } catch (e) {
+        console.log(`File input selector failed: ${selector}`);
+        // Continue
+      }
+    }
+
+    console.log(`⚠️ Could not find or upload ${fileType} file`);
+    
+    // Try drag and drop upload areas
+    const dropZoneSelectors = [
+      '.upload-zone', '.file-drop', '.drag-drop', '[data-testid*="upload"]',
+      '.file-upload-area', '.upload-area'
+    ];
+    
+    for (const selector of dropZoneSelectors) {
+      try {
+        const dropZone = page.locator(selector).first();
+        if (await dropZone.isVisible({ timeout: 1000 })) {
+          console.log(`Found drop zone: ${selector}`);
+          // Try clicking the drop zone to open file picker
+          await dropZone.click();
+          await page.waitForTimeout(1000);
+          
+          // Look for file input that appeared
+          const fileInput = page.locator('input[type="file"]').first();
+          if (await fileInput.isVisible({ timeout: 2000 })) {
+            await fileInput.setInputFiles(tempFilePath);
+            console.log(`✅ Uploaded ${fileType} via drop zone`);
+            setTimeout(() => fs.unlink(tempFilePath).catch(console.error), 5000);
+            return true;
+          }
         }
       } catch (e) {
         // Continue
@@ -349,6 +555,7 @@ export class RealApplicationService {
 
     // Cleanup temp file if upload failed
     await fs.unlink(tempFilePath).catch(console.error);
+    return false;
   }
 
   private async fillCustomResponses(page: Page, responses: Record<string, string>, filledData: Record<string, any>) {
@@ -466,6 +673,149 @@ export class RealApplicationService {
 
     console.log('❌ No submit button found after exhaustive search');
     return { success: false, error: 'Submit button not found after trying all selectors and scanning all buttons' };
+  }
+
+  private async verifySubmissionSuccess(page: Page): Promise<boolean> {
+    console.log('🔍 Verifying submission success...');
+    
+    const successIndicators = [
+      // Text-based indicators
+      ':has-text("thank you")',
+      ':has-text("application submitted")',
+      ':has-text("submission successful")',
+      ':has-text("we have received")',
+      ':has-text("confirmation")',
+      ':has-text("application received")',
+      ':has-text("successfully applied")',
+      
+      // Class-based indicators
+      '.success', '.confirmation', '.submitted', '.thank-you',
+      '.application-success', '.submission-complete',
+      
+      // ID-based indicators  
+      '#success', '#confirmation', '#submitted', '#thank-you',
+      
+      // Data attribute indicators
+      '[data-testid*="success"]', '[data-testid*="confirmation"]',
+      '[data-testid*="submitted"]', '[data-testid*="thank"]'
+    ];
+
+    for (const indicator of successIndicators) {
+      try {
+        if (await page.locator(indicator).first().isVisible({ timeout: 2000 })) {
+          const text = await page.locator(indicator).first().textContent() || '';
+          console.log(`✅ Submission confirmed with indicator: "${text.slice(0, 100)}..."`);
+          return true;
+        }
+      } catch (e) {
+        // Continue checking
+      }
+    }
+
+    // Check URL for success patterns
+    const currentUrl = page.url();
+    const successUrlPatterns = ['success', 'confirmation', 'thank', 'submitted', 'complete'];
+    
+    if (successUrlPatterns.some(pattern => currentUrl.toLowerCase().includes(pattern))) {
+      console.log(`✅ Submission confirmed by URL pattern: ${currentUrl}`);
+      return true;
+    }
+
+    // Check if we're on a different page (likely success)
+    if (!currentUrl.includes('apply') && !currentUrl.includes('job')) {
+      console.log(`✅ Submission likely successful - redirected to: ${currentUrl}`);
+      return true;
+    }
+
+    console.log(`❓ Could not verify submission success. Current URL: ${currentUrl}`);
+    return false;
+  }
+
+  private async handleMultiStepForm(page: Page): Promise<void> {
+    console.log('🔍 Checking for multi-step form navigation...');
+    
+    const nextStepSelectors = [
+      'button:has-text("Next")',
+      'button:has-text("Continue")',
+      'button:has-text("Proceed")',
+      'button:has-text("Step")',
+      '[data-testid*="next"]',
+      '[data-testid*="continue"]',
+      '.next-button',
+      '.continue-button'
+    ];
+
+    // Try to navigate through multiple steps
+    let maxSteps = 5; // Prevent infinite loops
+    while (maxSteps > 0) {
+      let foundNextButton = false;
+      
+      for (const selector of nextStepSelectors) {
+        try {
+          const nextButton = page.locator(selector).first();
+          if (await nextButton.isVisible({ timeout: 2000 })) {
+            const buttonText = await nextButton.textContent() || '';
+            console.log(`Found next step button: "${buttonText}"`);
+            
+            await nextButton.click();
+            await page.waitForTimeout(2000);
+            
+            foundNextButton = true;
+            break;
+          }
+        } catch (e) {
+          // Continue
+        }
+      }
+      
+      if (!foundNextButton) {
+        break;
+      }
+      
+      maxSteps--;
+    }
+    
+    console.log('✅ Multi-step form navigation completed');
+  }
+
+  private async debugFormState(page: Page): Promise<void> {
+    console.log('🔍 DEBUG: Analyzing form state...');
+    
+    try {
+      // Log all visible inputs
+      const inputs = await page.locator('input:visible').all();
+      console.log(`Found ${inputs.length} visible input fields:`);
+      
+      for (let i = 0; i < Math.min(inputs.length, 10); i++) {
+        const input = inputs[i];
+        const type = await input.getAttribute('type') || 'text';
+        const name = await input.getAttribute('name') || '';
+        const id = await input.getAttribute('id') || '';
+        const placeholder = await input.getAttribute('placeholder') || '';
+        const value = await input.inputValue() || '';
+        
+        console.log(`  Input ${i + 1}: type="${type}" name="${name}" id="${id}" placeholder="${placeholder}" value="${value.slice(0, 30)}"`);
+      }
+      
+      // Log all visible buttons
+      const buttons = await page.locator('button:visible').all();
+      console.log(`Found ${buttons.length} visible buttons:`);
+      
+      for (let i = 0; i < Math.min(buttons.length, 10); i++) {
+        const button = buttons[i];
+        const text = await button.textContent() || '';
+        const type = await button.getAttribute('type') || '';
+        const className = await button.getAttribute('class') || '';
+        
+        console.log(`  Button ${i + 1}: text="${text.slice(0, 30)}" type="${type}" class="${className.slice(0, 50)}"`);
+      }
+      
+      // Log current URL
+      console.log(`Current URL: ${page.url()}`);
+      
+    } catch (error) {
+      console.log('Debug form state failed:', error);
+    }
   }
 
   private async captureScreenshot(page: Page, sessionId: string, type: string): Promise<string> {
