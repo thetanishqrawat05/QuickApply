@@ -18,7 +18,8 @@ import {
   Sparkles,
   BarChart3,
   Plus,
-  CheckCircle
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function EnhancedAutoApplyPage() {
