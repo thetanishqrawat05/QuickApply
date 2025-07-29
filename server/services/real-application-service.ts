@@ -1,8 +1,9 @@
 import { Page } from 'playwright';
 import { RobustBrowserService } from './robust-browser-service';
 import { GeminiService } from './gemini-service';
-import { AutoLoginService } from './auto-login-service';
+import { EnhancedAutoLoginService } from './enhanced-auto-login-service';
 import { EmailService } from './email-service';
+import { AIFormAnalyzer, FormAnalysis } from './ai-form-analyzer';
 import { ComprehensiveProfile } from '@shared/schema';
 import { storage } from '../storage';
 import { v4 as uuidv4 } from 'uuid';
@@ -19,13 +20,15 @@ export interface RealApplicationRequest {
 export class RealApplicationService {
   private browserService: RobustBrowserService;
   private geminiService: GeminiService;
-  private autoLoginService: AutoLoginService;
+  private autoLoginService: EnhancedAutoLoginService;
+  private aiFormAnalyzer: AIFormAnalyzer;
   private emailService: EmailService;
 
   constructor() {
     this.browserService = new RobustBrowserService();
     this.geminiService = new GeminiService();
-    this.autoLoginService = new AutoLoginService();
+    this.autoLoginService = new EnhancedAutoLoginService();
+    this.aiFormAnalyzer = new AIFormAnalyzer();
     this.emailService = new EmailService();
   }
 
@@ -110,26 +113,29 @@ export class RealApplicationService {
         }
       }
 
-      // Auto-login if credentials provided
+      // Auto-login if credentials provided or detect login requirement
       if (request.profile.loginEmail && request.profile.loginPassword) {
-        try {
-          const loginSuccess = await this.autoLoginService.performAutoLogin(page, {
-            email: request.profile.loginEmail,
-            password: request.profile.loginPassword,
-            method: request.profile.preferredLoginMethod || 'email'
-          }, request.jobUrl);
-          
-          console.log(loginSuccess ? '✅ Auto-login successful' : '❌ Auto-login failed');
-        } catch (error) {
-          console.log('Auto-login service not available, proceeding without login');
+        const loginSuccess = await this.autoLoginService.performAutoLogin(page, {
+          email: request.profile.loginEmail,
+          password: request.profile.loginPassword,
+          method: request.profile.preferredLoginMethod || 'email'
+        }, request.jobUrl);
+        
+        if (!loginSuccess) {
+          return {
+            success: false,
+            sessionId,
+            message: 'Login failed. Please check your credentials and try again.'
+          };
         }
+        
+        console.log('✅ Auto-login successful, proceeding with application');
       }
 
-      // Find and navigate to application form
-      const applicationUrl = await this.findApplicationForm(page);
-      if (applicationUrl && applicationUrl !== page.url()) {
-        await page.goto(applicationUrl, { waitUntil: 'networkidle' });
-        console.log(`📝 Navigated to application form: ${applicationUrl}`);
+      // Navigate to application form first  
+      const applicationUrl = await this.findAndNavigateToApplication(page);
+      if (applicationUrl) {
+        console.log(`📝 Successfully navigated to: ${applicationUrl}`);
       }
 
       // Handle complete multi-step application workflow
@@ -251,7 +257,7 @@ export class RealApplicationService {
     }
   }
 
-  private async findApplicationForm(page: Page): Promise<string | null> {
+  private async findAndNavigateToApplication(page: Page): Promise<string | null> {
     console.log('🔍 Looking for Apply button...');
     
     const applySelectors = [
@@ -783,39 +789,270 @@ export class RealApplicationService {
   }
 
   private async handleMultiStepForm(page: Page, request: RealApplicationRequest): Promise<void> {
-    console.log('🔍 Handling multi-step application workflow...');
+    console.log('🔍 Starting intelligent multi-step application workflow...');
     
     let currentStep = 1;
-    const maxSteps = 10; // Prevent infinite loops
-    let filledData: Record<string, any> = {};
+    const maxSteps = 10;
+    const startTime = Date.now();
+    const maxDuration = 25000; // 25 seconds max
     
     while (currentStep <= maxSteps) {
-      console.log(`📋 Processing step ${currentStep}...`);
-      
-      // Analyze current page with AI
-      const pageAnalysis = await this.analyzePageWithAI(page);
-      
-      // Fill forms on current step
-      await this.fillCurrentStepForm(page, request, pageAnalysis, filledData);
-      
-      // Look for next step navigation
-      const nextStepResult = await this.navigateToNextStep(page);
-      
-      if (!nextStepResult.hasNext) {
-        console.log('✅ Reached final step or submit page');
+      // Check time limit
+      if (Date.now() - startTime > maxDuration) {
+        console.log('⏰ Time limit reached, proceeding to submit');
         break;
       }
       
-      if (nextStepResult.isSubmitStep) {
-        console.log('🎯 Reached submit step');
+      console.log(`📋 Step ${currentStep}: AI analyzing current page...`);
+      
+      // AI-powered page analysis
+      const analysis = await this.aiFormAnalyzer.analyzeCurrentPage(page);
+      console.log(`🤖 Detected: ${analysis.stepType} (confidence: ${analysis.confidence})`);
+      
+      // Handle different step types
+      const stepResult = await this.handleStepByType(page, request, analysis);
+      
+      if (stepResult.shouldSubmit) {
+        console.log('🎯 Ready to submit application');
+        break;
+      }
+      
+      if (!stepResult.canContinue) {
+        console.log('❌ Cannot continue, stopping workflow');
         break;
       }
       
       currentStep++;
-      await page.waitForTimeout(1000); // Brief pause between steps
+      await page.waitForTimeout(500); // Quick pause between steps
     }
     
-    console.log(`✅ Multi-step form navigation completed after ${currentStep} steps`);
+    console.log(`✅ Workflow completed in ${currentStep} steps (${Date.now() - startTime}ms)`);
+  }
+
+  private async handleStepByType(
+    page: Page, 
+    request: RealApplicationRequest, 
+    analysis: FormAnalysis
+  ): Promise<{ shouldSubmit: boolean; canContinue: boolean }> {
+    
+    switch (analysis.stepType) {
+      case 'login':
+        console.log('🔑 Handling login step...');
+        return await this.handleLoginStep(page, request);
+        
+      case 'profile':
+        console.log('👤 Filling profile information...');
+        await this.fillProfileStep(page, request.profile);
+        return { shouldSubmit: false, canContinue: true };
+        
+      case 'experience':
+        console.log('💼 Filling experience information...');
+        await this.fillExperienceStep(page, request.profile);
+        return { shouldSubmit: false, canContinue: true };
+        
+      case 'education':
+        console.log('🎓 Filling education information...');
+        await this.fillEducationStep(page, request.profile);
+        return { shouldSubmit: false, canContinue: true };
+        
+      case 'documents':
+        console.log('📄 Handling document uploads...');
+        await this.handleDocumentStep(page, request);
+        return { shouldSubmit: false, canContinue: true };
+        
+      case 'questions':
+        console.log('❓ Answering custom questions...');
+        await this.handleQuestionsStep(page, request.profile);
+        return { shouldSubmit: false, canContinue: true };
+        
+      case 'review':
+        console.log('👀 Reviewing application...');
+        await this.handleReviewStep(page);
+        return { shouldSubmit: false, canContinue: true };
+        
+      case 'submit':
+        console.log('🚀 Ready for submission...');
+        return { shouldSubmit: true, canContinue: false };
+        
+      default:
+        console.log('🔄 General form filling...');
+        await this.fillGeneralForm(page, request.profile);
+        return { shouldSubmit: false, canContinue: true };
+    }
+  }
+
+  private async handleLoginStep(page: Page, request: RealApplicationRequest): Promise<{ shouldSubmit: boolean; canContinue: boolean }> {
+    if (request.profile.loginEmail && request.profile.loginPassword) {
+      const success = await this.autoLoginService.performAutoLogin(page, {
+        email: request.profile.loginEmail,
+        password: request.profile.loginPassword,
+        method: request.profile.preferredLoginMethod || 'email'
+      }, request.jobUrl);
+      
+      return { shouldSubmit: false, canContinue: success };
+    }
+    
+    console.log('❌ No login credentials provided for required login');
+    return { shouldSubmit: false, canContinue: false };
+  }
+
+  private async fillProfileStep(page: Page, profile: ComprehensiveProfile): Promise<void> {
+    // Enhanced profile field detection and filling
+    const profileMappings = [
+      { selectors: ['input[name*="firstName" i]', 'input[id*="firstName" i]', 'input[placeholder*="first name" i]'], value: profile.name.split(' ')[0] },
+      { selectors: ['input[name*="lastName" i]', 'input[id*="lastName" i]', 'input[placeholder*="last name" i]'], value: profile.name.split(' ').slice(1).join(' ') },
+      { selectors: ['input[name*="name" i]', 'input[id*="name" i]', 'input[placeholder*="full name" i]'], value: profile.name },
+      { selectors: ['input[type="email"]', 'input[name*="email" i]', 'input[id*="email" i]'], value: profile.email },
+      { selectors: ['input[type="tel"]', 'input[name*="phone" i]', 'input[id*="phone" i]'], value: profile.phone },
+      { selectors: ['input[name*="address" i]', 'input[id*="address" i]'], value: profile.address || '' },
+      { selectors: ['input[name*="city" i]', 'input[id*="city" i]'], value: profile.city || '' },
+      { selectors: ['input[name*="state" i]', 'input[id*="state" i]', 'select[name*="state" i]'], value: profile.state || '' },
+      { selectors: ['input[name*="zip" i]', 'input[id*="zip" i]', 'input[name*="postal" i]'], value: profile.zipCode || '' }
+    ];
+
+    for (const mapping of profileMappings) {
+      await this.fillFieldWithSelectors(page, mapping.selectors, mapping.value);
+    }
+  }
+
+  private async fillExperienceStep(page: Page, profile: ComprehensiveProfile): Promise<void> {
+    const experienceSelectors = [
+      'textarea[name*="experience" i]', 'textarea[id*="experience" i]',
+      'textarea[name*="summary" i]', 'textarea[id*="summary" i]', 
+      'textarea[placeholder*="experience" i]', 'textarea[placeholder*="tell us about" i]'
+    ];
+
+    const experienceText = Array.isArray(profile.experience) 
+      ? profile.experience.map(exp => `${exp.title} at ${exp.company}: ${exp.description || ''}`).join('\n\n')
+      : 'Experienced software engineer with full-stack development expertise';
+
+    await this.fillFieldWithSelectors(page, experienceSelectors, experienceText);
+  }
+
+  private async fillEducationStep(page: Page, profile: ComprehensiveProfile): Promise<void> {
+    const educationSelectors = [
+      'input[name*="education" i]', 'input[id*="education" i]',
+      'input[name*="degree" i]', 'input[id*="degree" i]',
+      'select[name*="education" i]', 'select[id*="degree" i]'
+    ];
+
+    const educationValue = 'Bachelor\'s Degree in Computer Science';
+    await this.fillFieldWithSelectors(page, educationSelectors, educationValue);
+  }
+
+  private async handleDocumentStep(page: Page, request: RealApplicationRequest): Promise<void> {
+    if (request.resumeFile) {
+      await this.uploadFile(page, 'resume', request.resumeFile);
+    }
+    if (request.coverLetterFile) {
+      await this.uploadFile(page, 'cover-letter', request.coverLetterFile);
+    }
+  }
+
+  private async handleQuestionsStep(page: Page, profile: ComprehensiveProfile): Promise<void> {
+    // Find text areas and fill with intelligent responses
+    const questionSelectors = [
+      'textarea:visible',
+      'input[type="text"]:visible',
+      'input[type="textarea"]:visible'
+    ];
+
+    for (const selector of questionSelectors) {
+      try {
+        const fields = await page.locator(selector).all();
+        for (const field of fields) {
+          if (await field.isVisible()) {
+            const placeholder = await field.getAttribute('placeholder') || '';
+            const label = await this.getFieldLabel(page, field);
+            
+            // Generate intelligent response based on context
+            const response = this.generateQuestionResponse(placeholder + ' ' + label);
+            await field.fill(response);
+            console.log(`Filled question field: ${response.slice(0, 50)}...`);
+          }
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+
+  private async handleReviewStep(page: Page): Promise<void> {
+    // Just wait a moment for review, then proceed
+    console.log('📝 Reviewing application details...');
+    await page.waitForTimeout(1000);
+  }
+
+  private async fillFieldWithSelectors(page: Page, selectors: string[], value: string): Promise<boolean> {
+    for (const selector of selectors) {
+      try {
+        const field = page.locator(selector).first();
+        if (await field.isVisible({ timeout: 1000 })) {
+          await field.fill(value);
+          console.log(`✅ Filled field with selector: ${selector}`);
+          return true;
+        }
+      } catch (e) {
+        // Continue to next selector
+      }
+    }
+    return false;
+  }
+
+  private async uploadFile(page: Page, fileType: string, fileBuffer: Buffer): Promise<void> {
+    const uploadSelectors = [
+      `input[type="file"][name*="${fileType}" i]`,
+      `input[type="file"][id*="${fileType}" i]`,
+      'input[type="file"]'
+    ];
+
+    for (const selector of uploadSelectors) {
+      try {
+        const fileInput = page.locator(selector).first();
+        if (await fileInput.isVisible({ timeout: 1000 })) {
+          // Save buffer to temp file and upload
+          const tempPath = path.join('./temp', `${Date.now()}_${fileType}.pdf`);
+          await fs.writeFile(tempPath, fileBuffer);
+          await fileInput.setInputFiles(tempPath);
+          console.log(`✅ Uploaded ${fileType} file`);
+          
+          // Clean up temp file
+          setTimeout(() => fs.unlink(tempPath).catch(() => {}), 5000);
+          return;
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+
+  private generateQuestionResponse(context: string): string {
+    const lowerContext = context.toLowerCase();
+    
+    if (lowerContext.includes('why') || lowerContext.includes('interest')) {
+      return 'I am passionate about technology and excited about the opportunity to contribute to innovative projects while growing my career.';
+    } else if (lowerContext.includes('strength') || lowerContext.includes('skill')) {
+      return 'My key strengths include problem-solving, attention to detail, and the ability to work effectively in team environments.';
+    } else if (lowerContext.includes('goal') || lowerContext.includes('future')) {
+      return 'My goal is to continuously develop my technical skills while making meaningful contributions to impactful projects.';
+    } else {
+      return 'I believe my experience and dedication make me a strong candidate for this position.';
+    }
+  }
+
+  private async getFieldLabel(page: Page, field: any): Promise<string> {
+    try {
+      const labelSelector = await field.getAttribute('aria-label') || 
+                           await field.getAttribute('data-label') || '';
+      return labelSelector;
+    } catch {
+      return '';
+    }
+  }
+
+  private async fillGeneralForm(page: Page, profile: ComprehensiveProfile): Promise<void> {
+    // Fallback general form filling for any unrecognized pages
+    await this.fillProfileStep(page, profile);
   }
 
   private async analyzePageWithAI(page: Page): Promise<{
