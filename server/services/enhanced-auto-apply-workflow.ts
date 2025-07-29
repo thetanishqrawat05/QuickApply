@@ -629,12 +629,7 @@ export class EnhancedAutoApplyWorkflowService {
     const profile = session.profileData as ComprehensiveProfile;
     
     // Send email confirmation
-    await this.emailService.sendConfirmationEmail(
-      session,
-      method,
-      success,
-      session.errorMessage
-    );
+    await this.emailService.sendConfirmationEmail(session, success);
 
     // Send WhatsApp confirmation if enabled
     if (profile.enableWhatsappNotifications && profile.whatsappNumber) {
