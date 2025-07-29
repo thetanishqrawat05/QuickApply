@@ -14,7 +14,8 @@ const EnhancedAutoApply = lazy(() => import("@/pages/enhanced-auto-apply"));
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={EnhancedAutoApply} />
+      <Route path="/basic-apply" component={Home} />
       <Route path="/enhanced-apply" component={EnhancedApply} />
       <Route path="/auto-apply" component={AutoApply} />
       <Route path="/enhanced-auto-apply" component={EnhancedAutoApply} />
