@@ -350,7 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Start auto-apply workflow with fallback to mock service
       let result;
       try {
-        result = await autoApplyWorkflowService.startAutoApplyProcess({
+        result = await enhancedAutoApplyWorkflowService.startEnhancedAutoApplyProcess({
           jobUrl,
           profile: validationResult.data,
           resumeFile: resumeFile.buffer,

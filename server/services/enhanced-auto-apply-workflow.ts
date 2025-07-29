@@ -120,7 +120,7 @@ export class EnhancedAutoApplyWorkflowService {
             jobDetails.companyName,
             jobDetails.jobDescription,
             request.profile.name,
-            request.profile.experience || ''
+            typeof request.profile.experience === 'string' ? request.profile.experience : JSON.stringify(request.profile.experience || [])
           );
           
           await storage.updateApplicationSession(sessionId, {
@@ -699,7 +699,7 @@ export class EnhancedAutoApplyWorkflowService {
             jobDetails.companyName,
             jobDetails.jobDescription,
             request.profile.name,
-            request.profile.experience || ''
+            typeof request.profile.experience === 'string' ? request.profile.experience : JSON.stringify(request.profile.experience || [])
           );
           
           await storage.updateApplicationSession(sessionId, {
