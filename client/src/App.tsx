@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 
 const LandingPage = lazy(() => import("@/pages/landing"));
 const AutoApply = lazy(() => import("@/pages/auto-apply"));
+const SecureLoginDemo = lazy(() => import("@/pages/secure-login-demo"));
 
 function Router() {
   return (
@@ -19,6 +20,7 @@ function Router() {
           <AutoApply />
         </ProtectedRoute>
       </Route>
+      <Route path="/secure-login-demo" component={SecureLoginDemo} />
       <Route component={NotFound} />
     </Switch>
   );

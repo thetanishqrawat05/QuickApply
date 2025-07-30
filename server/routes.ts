@@ -9,6 +9,7 @@ import { AutoApplyWorkflowService } from "./services/auto-apply-workflow";
 import { EnhancedAutoApplyWorkflowService } from "./services/enhanced-auto-apply-workflow";
 import { RealApplicationService } from "./services/real-application-service";
 import { ManualLoginAutomationService } from "./services/manual-login-automation";
+import { SecureLoginLinkService } from "./services/secure-login-link-service";
 import { storage } from "./storage";
 
 const upload = multer({
@@ -34,6 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const enhancedAutoApplyWorkflowService = new EnhancedAutoApplyWorkflowService();
   const realApplicationService = new RealApplicationService();
   const manualLoginAutomationService = new ManualLoginAutomationService();
+  const secureLoginLinkService = new SecureLoginLinkService();
 
   // User management routes
   app.post("/api/users", async (req, res) => {
@@ -1034,6 +1036,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
           </body>
         </html>
       `);
+    }
+  });
+
+  // Secure Login Link System Routes
+  app.post("/api/create-secure-login", async (req, res) => {
+    try {
+      const { sessionId, userId, userEmail, jobUrl, platform, loginUrl, authMethod, enableWhatsApp, whatsappNumber } = req.body;
+      
+      if (!sessionId || !userId || !userEmail || !jobUrl || !platform || !loginUrl) {
+        return res.status(400).json({ 
+          message: "Missing required fields: sessionId, userId, userEmail, jobUrl, platform, loginUrl" 
+        });
+      }
+
+      const loginSession = await secureLoginLinkService.createSecureLoginSession({
+        sessionId,
+        userId: parseInt(userId),
+        userEmail,
+        jobUrl,
+        platform,
+        loginUrl,
+        authMethod: authMethod || 'manual',
+        enableWhatsApp,
+        whatsappNumber
+      });
+
+      res.json({
+        success: true,
+        loginSessionId: loginSession.id,
+        message: "Secure login link created and sent",
+        expiresAt: loginSession.expiresAt
+      });
+    } catch (error) {
+      console.error("Create secure login error:", error);
+      res.status(500).json({ 
+        message: "Failed to create secure login session",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Secure login link handler
+  app.get("/secure-login/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const result = await secureLoginLinkService.processSecureLogin(token);
+      
+      if (!result.success) {
+        return res.send(`
+          <html>
+            <head>
+              <title>Login Link Error</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <style>
+                body { 
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                  text-align: center; 
+                  padding: 50px; 
+                  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+                  color: white;
+                  margin: 0;
+                  min-height: 100vh;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                }
+                .container {
+                  background: rgba(255, 255, 255, 0.95);
+                  color: #333;
+                  padding: 40px;
+                  border-radius: 15px;
+                  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                  max-width: 500px;
+                }
+                .icon { font-size: 4rem; margin-bottom: 20px; }
+                h1 { margin: 0 0 20px 0; color: #333; }
+                p { font-size: 1.1rem; line-height: 1.6; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="icon">🔐</div>
+                <h1>Login Link Error</h1>
+                <p>${result.message}</p>
+                <p style="margin-top: 30px; font-size: 0.9rem; color: #666;">
+                  Please request a new login link if needed.
+                </p>
+              </div>
+            </body>
+          </html>
+        `);
+      }
+
+      // Successful login - redirect to application dashboard or continue flow
+      res.send(`
+        <html>
+          <head>
+            <title>Login Successful</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                text-align: center; 
+                padding: 50px; 
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              .container {
+                background: rgba(255, 255, 255, 0.95);
+                color: #333;
+                padding: 40px;
+                border-radius: 15px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                max-width: 500px;
+              }
+              .icon { font-size: 4rem; margin-bottom: 20px; }
+              h1 { margin: 0 0 20px 0; color: #333; }
+              p { font-size: 1.1rem; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="icon">✅</div>
+              <h1>Login Successful!</h1>
+              <p>${result.message}</p>
+              <p style="margin-top: 30px; font-size: 0.9rem; color: #666;">
+                Your job application will continue automatically. You can close this window.
+              </p>
+            </div>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("Secure login processing error:", error);
+      res.status(500).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>❌ Error</h1>
+            <p>Failed to process secure login: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  // Check login status for automation services
+  app.get("/api/check-login-status/:sessionId", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const status = await secureLoginLinkService.monitorLoginStatus(sessionId);
+      res.json(status);
+    } catch (error) {
+      console.error("Check login status error:", error);
+      res.status(500).json({ 
+        message: "Failed to check login status",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Get login dashboard data
+  app.get("/api/users/:userId/login-dashboard", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const dashboardData = await secureLoginLinkService.getLoginDashboardData(userId);
+      res.json(dashboardData);
+    } catch (error) {
+      console.error("Get login dashboard error:", error);
+      res.status(500).json({ 
+        message: "Failed to get login dashboard data",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Cleanup expired login sessions
+  app.post("/api/cleanup-expired-logins", async (req, res) => {
+    try {
+      await secureLoginLinkService.cleanupExpiredSessions();
+      res.json({ success: true, message: "Expired login sessions cleaned up" });
+    } catch (error) {
+      console.error("Cleanup expired logins error:", error);
+      res.status(500).json({ 
+        message: "Failed to cleanup expired sessions",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

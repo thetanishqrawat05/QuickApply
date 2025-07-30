@@ -61,6 +61,37 @@ export class EmailService {
     }
   }
 
+  async sendSecureLoginEmail(params: {
+    to: string;
+    platformName: string;
+    jobUrl: string;
+    loginLink: string;
+    expiresAt: Date;
+  }): Promise<boolean> {
+    try {
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.warn('⚠️ Email credentials not configured. Skipping secure login email.');
+        console.log(`🔗 Manual login link: ${params.loginLink}`);
+        return true;
+      }
+
+      const htmlContent = this.generateSecureLoginEmailHTML(params);
+
+      await this.transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: params.to,
+        subject: `🔐 Secure Login Required - ${params.platformName} Job Application`,
+        html: htmlContent,
+      });
+
+      console.log(`✅ Secure login email sent to: ${params.to}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to send secure login email:', error);
+      return false;
+    }
+  }
+
   async sendJobApplicationReview(
     email: string,
     jobTitle: string,
@@ -418,6 +449,84 @@ export class EmailService {
 
           <div class="footer">
             <p>Auto Job Applier - Automated Job Application Assistant</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private generateSecureLoginEmailHTML(params: {
+    to: string;
+    platformName: string;
+    jobUrl: string;
+    loginLink: string;
+    expiresAt: Date;
+  }): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Secure Login Required</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #3b82f6; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; }
+          .login-section { background: white; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; border: 2px solid #3b82f6; }
+          .login-btn { 
+            display: inline-block; 
+            background: #3b82f6; 
+            color: white; 
+            padding: 15px 30px; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            font-weight: bold;
+            margin: 10px;
+          }
+          .footer { background: #1f2937; color: white; padding: 15px; text-align: center; border-radius: 0 0 8px 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔐 Secure Login Required</h1>
+            <p>Job Application for ${params.platformName}</p>
+          </div>
+          
+          <div class="content">
+            <h3>Login Required for Job Application</h3>
+            <p>Your job application is ready to submit, but ${params.platformName} requires you to log in first.</p>
+            
+            <p><strong>Job URL:</strong> <a href="${params.jobUrl}" target="_blank">${params.jobUrl}</a></p>
+            
+            <div class="login-section">
+              <h3>Click to Login Securely</h3>
+              <p>This secure link will open ${params.platformName} for you to log in. After successful login, your application will automatically continue.</p>
+              
+              <a href="${params.loginLink}" class="login-btn">🔐 Login to ${params.platformName}</a>
+              
+              <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">
+                This secure link expires on ${params.expiresAt.toLocaleString()} for security.
+              </p>
+            </div>
+            
+            <h3>What happens next?</h3>
+            <ol>
+              <li>Click the secure login button above</li>
+              <li>Log in to ${params.platformName} using your credentials</li>
+              <li>Our system will detect successful login</li>
+              <li>Your application will automatically be submitted</li>
+            </ol>
+            
+            <p><strong>Security Note:</strong> This is a secure, encrypted link that only works for your specific application session.</p>
+          </div>
+
+          <div class="footer">
+            <p>Auto Job Applier - Secure Login Assistant</p>
+            <p style="font-size: 12px;">Generated on ${new Date().toLocaleString()}</p>
           </div>
         </div>
       </body>

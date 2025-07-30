@@ -49,7 +49,10 @@ export interface IStorage {
   createLoginSession(insertLoginSession: InsertLoginSession): Promise<LoginSessionRecord>;
   getLoginSessionByToken(token: string): Promise<LoginSessionRecord | undefined>;
   getLoginSessionsByUser(userEmail: string): Promise<LoginSessionRecord[]>;
+  getLoginSessionsByUserId(userId: number): Promise<LoginSessionRecord[]>;
+  getLoginSessionsByApplicationSessionId(sessionId: string): Promise<LoginSessionRecord[]>;
   updateLoginSession(token: string, data: Partial<InsertLoginSession>): Promise<LoginSessionRecord>;
+  getExpiredLoginSessions(): Promise<LoginSessionRecord[]>;
   deleteExpiredLoginSessions(): Promise<void>;
   
   // Temporary data operations (for automation sessions)
@@ -201,7 +204,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLoginSessionByToken(token: string): Promise<LoginSessionRecord | undefined> {
-    const [session] = await db.select().from(loginSessions).where(eq(loginSessions.id, token));
+    const [session] = await db.select().from(loginSessions).where(eq(loginSessions.secureToken, token));
     return session || undefined;
   }
 
@@ -211,6 +214,29 @@ export class DatabaseStorage implements IStorage {
       .from(loginSessions)
       .where(eq(loginSessions.userEmail, userEmail))
       .orderBy(desc(loginSessions.createdAt));
+  }
+
+  async getLoginSessionsByUserId(userId: number): Promise<LoginSessionRecord[]> {
+    return db
+      .select()
+      .from(loginSessions)
+      .where(eq(loginSessions.userId, userId))
+      .orderBy(desc(loginSessions.createdAt));
+  }
+
+  async getLoginSessionsByApplicationSessionId(sessionId: string): Promise<LoginSessionRecord[]> {
+    return db
+      .select()
+      .from(loginSessions)
+      .where(eq(loginSessions.sessionId, sessionId))
+      .orderBy(desc(loginSessions.createdAt));
+  }
+
+  async getExpiredLoginSessions(): Promise<LoginSessionRecord[]> {
+    return db
+      .select()
+      .from(loginSessions)
+      .where(lt(loginSessions.expiresAt, new Date()));
   }
 
   async updateLoginSession(token: string, data: Partial<InsertLoginSession>): Promise<LoginSessionRecord> {

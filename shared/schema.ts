@@ -223,19 +223,25 @@ export const applicationLogs = pgTable('application_logs', {
   notes: text('notes'),
 });
 
+// Login Sessions for Secure Login Link System
 export const loginSessions = pgTable('login_sessions', {
-  id: varchar('id', { length: 36 }).primaryKey(), // loginToken
+  id: varchar('id', { length: 36 }).primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
   sessionId: varchar('session_id', { length: 36 }).references(() => applicationSessions.id).notNull(),
-  portalName: varchar('portal_name', { length: 255 }).notNull(),
-  loginUrl: text('login_url').notNull(),
+  platform: varchar('platform', { length: 100 }).notNull(), // google, linkedin, workday, etc.
+  loginUrl: text('login_url').notNull(), // Original job portal login URL
   jobUrl: text('job_url').notNull(),
+  secureToken: varchar('secure_token', { length: 128 }).notNull().unique(),
+  browserSessionData: json('browser_session_data'), // Stored cookies/session after login
+  loginStatus: varchar('login_status', { length: 50 }).default('pending').notNull(), // pending, completed, expired, failed
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
   userEmail: varchar('user_email', { length: 255 }).notNull(),
-  status: varchar('status', { length: 50 }).notNull().default('pending'),
-  authMethod: varchar('auth_method', { length: 50 }).notNull(),
+  authMethod: varchar('auth_method', { length: 50 }).notNull().default('manual'),
   errorMessage: text('error_message'),
+  loginCompletedAt: timestamp('login_completed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   expiresAt: timestamp('expires_at').notNull(),
-  authenticatedAt: timestamp('authenticated_at'),
 });
 
 // Relations
@@ -243,6 +249,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   jobApplications: many(jobApplications),
   applicationSessions: many(applicationSessions),
   applicationLogs: many(applicationLogs),
+  loginSessions: many(loginSessions),
 }));
 
 export const jobApplicationsRelations = relations(jobApplications, ({ one }) => ({
@@ -262,6 +269,10 @@ export const applicationSessionsRelations = relations(applicationSessions, ({ on
 }));
 
 export const loginSessionsRelations = relations(loginSessions, ({ one }) => ({
+  user: one(users, {
+    fields: [loginSessions.userId],
+    references: [users.id],
+  }),
   applicationSession: one(applicationSessions, {
     fields: [loginSessions.sessionId],
     references: [applicationSessions.id],

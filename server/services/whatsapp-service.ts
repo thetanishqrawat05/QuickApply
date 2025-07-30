@@ -154,4 +154,46 @@ ${failed > 0 ? `*Failed Applications:*\n${results.filter(r => r.status === 'fail
       return false;
     }
   }
+
+  async sendSecureLoginNotification(
+    toNumber: string,
+    platformName: string,
+    loginLink: string
+  ): Promise<boolean> {
+    if (!this.twilio) {
+      console.log('WhatsApp service not configured, skipping secure login notification');
+      return false;
+    }
+
+    const message = `
+🔐 *Secure Login Required*
+
+*Platform:* ${platformName}
+
+Your job application is ready but requires login first.
+
+🔗 *Click to Login Securely:*
+${loginLink}
+
+After login, your application will continue automatically.
+
+⏰ Link expires in 24 hours for security.
+
+Reply STOP to opt out.
+    `.trim();
+
+    try {
+      await this.twilio.messages.create({
+        from: `whatsapp:${this.fromNumber}`,
+        to: `whatsapp:${toNumber}`,
+        body: message
+      });
+
+      console.log(`WhatsApp secure login notification sent to ${toNumber}`);
+      return true;
+    } catch (error) {
+      console.error('WhatsApp secure login notification error:', error);
+      return false;
+    }
+  }
 }

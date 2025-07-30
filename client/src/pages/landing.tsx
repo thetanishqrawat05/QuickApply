@@ -49,8 +49,8 @@ export default function LandingPage() {
           onClick: () => document.getElementById('login-section')?.scrollIntoView({ behavior: 'smooth' })
         }}
         secondaryAction={{
-          label: "Learn More",
-          onClick: () => document.getElementById('features-section')?.scrollIntoView({ behavior: 'smooth' })
+          label: "Demo Secure Login",
+          onClick: () => setLocation('/secure-login-demo')
         }}
         features={[
           "AI-Generated Cover Letters",
