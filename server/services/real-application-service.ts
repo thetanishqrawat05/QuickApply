@@ -1149,9 +1149,7 @@ This will send you an email with a secure login link when login is needed.
     console.log('❌ Login appears to be required. Providing guidance to user.');
     return { 
       shouldSubmit: false, 
-      canContinue: false,
-      requiresLogin: true,
-      guidance: 'This job portal requires login. Please provide your login credentials in the form and try again.'
+      canContinue: false
     };
   }
 

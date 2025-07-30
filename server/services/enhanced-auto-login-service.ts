@@ -3,7 +3,7 @@ import { Page } from 'playwright';
 export interface LoginCredentials {
   email: string;
   password: string;
-  method: 'email' | 'google' | 'linkedin';
+  method: 'email' | 'google' | 'linkedin' | 'manual';
 }
 
 export class EnhancedAutoLoginService {
