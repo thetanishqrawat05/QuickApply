@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SeamlessFeedback, ProgressSteps } from '@/components/ui/seamless-feedback';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -122,18 +122,20 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
 
   const onSubmit = (data: ComprehensiveProfile) => {
     if (!resumeFile) {
-      toast({
-        title: "Resume Required",
-        description: "Please upload your resume to continue",
-        variant: "destructive"
-      });
+      // Seamless feedback instead of error toast - just return silently
       return;
     }
 
+    const finalData = {
+      ...data,
+      resumeFileName: resumeFile?.name || '',
+      coverLetterFileName: coverLetterFile?.name || ''
+    };
+
     enhancedApplyMutation.mutate({
       jobUrl,
-      profile: data,
-      resumeFile,
+      profile: finalData,
+      resumeFile: resumeFile || undefined,
       coverLetterFile: coverLetterFile || undefined
     });
   };
@@ -161,13 +163,19 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
         </div>
       </div>
 
-      <Alert>
-        <Sparkles className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Enhanced Features:</strong> This version includes auto-login capabilities, AI-generated cover letters, 
-          WhatsApp notifications, CAPTCHA detection, and comprehensive application logging.
-        </AlertDescription>
-      </Alert>
+      <div className="glass-card rounded-2xl p-6">
+        <div className="flex items-center space-x-3">
+          <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+            <Sparkles className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg">Enhanced Features</h3>
+            <p className="text-muted-foreground text-sm">
+              Auto-login capabilities, AI-generated cover letters, WhatsApp notifications, CAPTCHA detection, and comprehensive application logging.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -264,12 +272,18 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
 
               {form.watch('preferredLoginMethod') !== 'manual' && (
                 <>
-                  <Alert className="border-blue-200 bg-blue-50">
-                    <Info className="h-4 w-4 text-blue-600" />
-                    <AlertDescription className="text-blue-800">
-                      <strong>Required for most job platforms:</strong> Google Careers, LinkedIn Jobs, and company portals typically require login to submit applications.
-                    </AlertDescription>
-                  </Alert>
+                  <div className="glass-card rounded-xl p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="p-2 rounded-lg bg-blue-100 border border-blue-200">
+                        <Info className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-blue-800">
+                          <strong>Required for most job platforms:</strong> Google Careers, LinkedIn Jobs, and company portals typically require login to submit applications.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
@@ -481,12 +495,18 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
                     }
                   </p>
                   {useRealSubmission && (
-                    <Alert className="mt-2 border-green-200 bg-green-50">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <AlertDescription className="text-green-800">
-                        <strong>Real submission mode enabled.</strong> Applications will be submitted directly to company portals and you'll receive confirmation emails from companies.
-                      </AlertDescription>
-                    </Alert>
+                    <div className="glass-card rounded-xl p-4 mt-2">
+                      <div className="flex items-start space-x-3">
+                        <div className="p-2 rounded-lg bg-green-100 border border-green-200">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-green-800">
+                            <strong>Real submission mode enabled.</strong> Applications will be submitted directly to company portals and you'll receive confirmation emails from companies.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

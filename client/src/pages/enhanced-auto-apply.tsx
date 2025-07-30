@@ -7,11 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ModernHeader } from '@/components/ui/modern-header';
-import { HeroSection } from '@/components/ui/hero-section';
-import { FeatureCard } from '@/components/ui/feature-card';
-import { StatsCard } from '@/components/ui/stats-card';
+import { ModernHero } from '@/components/ui/modern-hero';
+import { ModernCard, FeatureCard } from '@/components/ui/modern-card';
+import { SeamlessFeedback } from '@/components/ui/seamless-feedback';
 
 import { 
   Brain, 
@@ -53,10 +51,8 @@ export default function EnhancedAutoApplyPage() {
 
   return (
     <div className="min-h-screen">
-      <ModernHeader />
-      
-      {/* Hero Section */}
-      <HeroSection
+      {/* Modern Hero Section */}
+      <ModernHero
         title="Apply to Jobs in Seconds"
         subtitle="AI-Powered Job Applications"
         description="The world's most advanced job application automation tool. Generate AI cover letters, handle secure logins, and get real-time notifications via email and WhatsApp."
@@ -79,26 +75,29 @@ export default function EnhancedAutoApplyPage() {
       <section className="py-16 bg-background/50">
         <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <StatsCard
+            <ModernCard
               title="Success Rate"
-              value="97%"
               description="Applications successfully submitted"
               icon={Target}
-              trend={{ value: 12, isPositive: true }}
+              badge="97%"
+              delay={0.1}
+              interactive={true}
             />
-            <StatsCard
+            <ModernCard
               title="Time Saved"
-              value="15 min"
               description="Average time saved per application"
               icon={Clock}
-              trend={{ value: 8, isPositive: true }}
+              badge="15 min"
+              delay={0.2}
+              interactive={true}
             />
-            <StatsCard
+            <ModernCard
               title="Accuracy"
-              value="99%"
               description="Form filling accuracy rate"
               icon={Shield}
-              trend={{ value: 5, isPositive: true }}
+              badge="99%"
+              delay={0.3}
+              interactive={true}
             />
           </div>
         </div>
@@ -111,10 +110,10 @@ export default function EnhancedAutoApplyPage() {
             {/* Features Grid */}
             <section>
               <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold gradient-text mb-4">
+                <h2 className="text-3xl font-bold gradient-text mb-4 fade-in-up">
                   Choose Your Application Method
                 </h2>
-                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                <p className="text-lg text-muted-foreground max-w-2xl mx-auto fade-in-up stagger-1">
                   Select the perfect automation level for your job search strategy
                 </p>
               </div>
@@ -123,6 +122,7 @@ export default function EnhancedAutoApplyPage() {
                 <FeatureCard
                   title="Enhanced Auto Apply"
                   description="Full automation with AI cover letters, auto-login, and multi-channel notifications"
+                  delay={0.1}
                   icon={Bot}
                   highlight={true}
                   features={[
@@ -227,24 +227,28 @@ export default function EnhancedAutoApplyPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Alert className="border-green-200 bg-green-50">
-                  <Sparkles className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    <div className="space-y-2">
-                      <p><strong>Session ID:</strong> {sessionId}</p>
-                      <p><strong>Enhanced Features Active:</strong></p>
-                      <ul className="list-disc ml-4 space-y-1">
-                        <li>Auto-login to company portals</li>
-                        <li>AI-generated cover letter</li>
-                        <li>CAPTCHA detection and handling</li>
-                        <li>Email and WhatsApp notifications</li>
-                        <li>Screenshot capture upon submission</li>
-                        <li>60-second auto-submit timer</li>
-                        <li>Comprehensive application logging</li>
-                      </ul>
+                <div className="glass-card rounded-xl p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="p-2 rounded-lg bg-green-100 border border-green-200">
+                      <Sparkles className="h-4 w-4 text-green-600" />
                     </div>
-                  </AlertDescription>
-                </Alert>
+                    <div className="flex-1">
+                      <div className="space-y-2 text-green-800">
+                        <p><strong>Session ID:</strong> {sessionId}</p>
+                        <p><strong>Enhanced Features Active:</strong></p>
+                        <ul className="list-disc ml-4 space-y-1 text-sm">
+                          <li>Auto-login to company portals</li>
+                          <li>AI-generated cover letter</li>
+                          <li>CAPTCHA detection and handling</li>
+                          <li>Email and WhatsApp notifications</li>
+                          <li>Screenshot capture upon submission</li>
+                          <li>60-second auto-submit timer</li>
+                          <li>Comprehensive application logging</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="glass-card p-4 rounded-lg">
                   <h3 className="font-semibold gradient-text mb-2">What's happening now:</h3>
@@ -279,13 +283,19 @@ export default function EnhancedAutoApplyPage() {
         {!applicationStarted && (
           <div className="space-y-8 mt-16">
             {/* Real Application Notice */}
-            <Alert className="max-w-4xl mx-auto border-orange-200 bg-orange-50 glass-card">
-              <AlertTriangle className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="text-orange-800">
-                <strong>🎉 Real Application Mode Available!</strong> Toggle between simulation mode (email review) and 
-                <strong> REAL application submission</strong> that actually submits to company portals.
-              </AlertDescription>
-            </Alert>
+            <div className="glass-card rounded-2xl p-6 max-w-4xl mx-auto">
+              <div className="flex items-start space-x-4">
+                <div className="p-3 rounded-lg bg-gradient-to-br from-orange-100 to-orange-50 border border-orange-200">
+                  <AlertTriangle className="h-5 w-5 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-orange-900 mb-2">🎉 Real Application Mode Available!</h3>
+                  <p className="text-orange-800 text-sm">
+                    Toggle between simulation mode (email review) and <strong>REAL application submission</strong> that actually submits to company portals.
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-8 glass-card shadow-soft">
@@ -322,12 +332,18 @@ export default function EnhancedAutoApplyPage() {
                           <p className="text-sm text-muted-foreground mt-1">
                             Supports: Greenhouse, Lever, Workday, BambooHR, SmartRecruiters, and company career sites
                           </p>
-                          <Alert className="mt-3 border-blue-200 bg-blue-50">
-                            <Globe className="h-4 w-4 text-blue-600" />
-                            <AlertDescription className="text-blue-800">
-                              <strong>Ready for Real Applications:</strong> Once you enter a URL, you'll see the new "Real Application Submission" toggle in the form below!
-                            </AlertDescription>
-                          </Alert>
+                          <div className="glass-card rounded-xl p-4 mt-3">
+                            <div className="flex items-start space-x-3">
+                              <div className="p-2 rounded-lg bg-blue-100 border border-blue-200">
+                                <Globe className="h-4 w-4 text-blue-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm text-blue-800">
+                                  <strong>Ready for Real Applications:</strong> Once you enter a URL, you'll see the new "Real Application Submission" toggle in the form below!
+                                </p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
