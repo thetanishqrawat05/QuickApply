@@ -232,11 +232,11 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5" />
-                Auto-Login Credentials (Optional)
+                <Key className="h-5 w-5 text-orange-600" />
+                Auto-Login Credentials (REQUIRED for most jobs)
               </CardTitle>
               <CardDescription>
-                Provide login credentials for automatic sign-in to company portals. All data is encrypted and secure.
+                <span className="text-orange-600 font-medium">⚠️ Most job platforms require login credentials.</span> Provide your account details for automatic sign-in. All data is encrypted and secure.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -266,14 +266,14 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
 
               {form.watch('preferredLoginMethod') !== 'manual' && (
                 <>
-                  <div className="glass-card rounded-xl p-4">
+                  <div className="glass-card rounded-xl p-4 border border-orange-200 bg-orange-50">
                     <div className="flex items-start space-x-3">
-                      <div className="p-2 rounded-lg bg-blue-100 border border-blue-200">
-                        <Info className="h-4 w-4 text-blue-600" />
+                      <div className="p-2 rounded-lg bg-orange-100 border border-orange-200">
+                        <Info className="h-4 w-4 text-orange-600" />
                       </div>
                       <div>
-                        <p className="text-sm text-blue-800">
-                          <strong>Required for most job platforms:</strong> Google Careers, LinkedIn Jobs, and company portals typically require login to submit applications.
+                        <p className="text-sm text-orange-800">
+                          <strong>LOGIN CREDENTIALS REQUIRED:</strong> Google Careers, LinkedIn Jobs, and most company portals require login to submit applications. Please fill out both email and password below.
                         </p>
                       </div>
                     </div>
