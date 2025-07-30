@@ -89,13 +89,14 @@ export class ScreenshotService {
       await this.ensureUploadsDir();
       
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `${type}_${sessionId}_${timestamp}.png`;
+      const filename = `${type}_${sessionId}_${timestamp}.jpg`;
       const filepath = path.join(this.uploadsDir, filename);
 
       await page.screenshot({
         path: filepath,
         fullPage: true,
-        quality: 90
+        quality: 90,
+        type: 'jpeg'
       });
 
       console.log(`📸 Screenshot saved: ${filepath}`);
@@ -103,7 +104,8 @@ export class ScreenshotService {
 
     } catch (error) {
       console.error('Screenshot capture error:', error);
-      throw new Error('Failed to capture screenshot: ' + (error as Error).message);
+      console.log('Continuing without screenshot to prevent workflow interruption');
+      return ''; // Return empty string to continue workflow
     }
   }
 
@@ -112,17 +114,18 @@ export class ScreenshotService {
       await this.ensureUploadsDir();
       
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `error_${sessionId}_${timestamp}.png`;
+      const filename = `error_${sessionId}_${timestamp}.jpg`;
       const filepath = path.join(this.uploadsDir, filename);
 
       await page.screenshot({
         path: filepath,
         fullPage: true,
-        quality: 70
+        quality: 70,
+        type: 'jpeg'
       });
 
       // Also save error details
-      const errorFile = filepath.replace('.png', '_details.txt');
+      const errorFile = filepath.replace('.jpg', '_details.txt');
       await fs.writeFile(errorFile, `Error: ${error}\nTimestamp: ${new Date().toISOString()}\nURL: ${page.url()}`, 'utf-8');
 
       console.log(`❌ Error screenshot saved: ${filepath}`);

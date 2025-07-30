@@ -280,12 +280,17 @@ export class ManualLoginAutomationService {
       // Fill the form with user data
       await this.fillApplicationForm(session.page, profile, aiCoverLetter);
 
-      // Take screenshot before submission
-      const screenshotPath = await this.screenshotService.captureScreenshot(
-        session.page, 
-        sessionId, 
-        'pre-submission'
-      );
+      // Take screenshot before submission (continue even if screenshot fails)
+      let screenshotPath = '';
+      try {
+        screenshotPath = await this.screenshotService.captureScreenshot(
+          session.page, 
+          sessionId, 
+          'pre-submission'
+        );
+      } catch (screenshotError) {
+        console.log('Screenshot failed, continuing with workflow:', screenshotError);
+      }
 
       // Update session with filled data
       await storage.updateApplicationSession(sessionId, {
@@ -417,12 +422,17 @@ export class ManualLoginAutomationService {
       // Find and click submit button
       const submitSuccess = await this.findAndClickSubmitButton(session.page);
 
-      // Take confirmation screenshot
-      const confirmationScreenshot = await this.screenshotService.captureScreenshot(
-        session.page,
-        sessionId,
-        'confirmation'
-      );
+      // Take confirmation screenshot (continue even if screenshot fails)
+      let confirmationScreenshot = '';
+      try {
+        confirmationScreenshot = await this.screenshotService.captureScreenshot(
+          session.page,
+          sessionId,
+          'confirmation'
+        );
+      } catch (screenshotError) {
+        console.log('Confirmation screenshot failed, continuing:', screenshotError);
+      }
 
       // Verify submission
       const submissionVerified = await this.verifySubmissionSuccess(session.page);

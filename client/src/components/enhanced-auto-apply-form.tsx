@@ -62,11 +62,13 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
       preferredLoginMethod: 'email',
       loginEmail: '',
       loginPassword: '',
+      whatsappNumber: '',
       resumeFileName: '',
       coverLetterFileName: '',
       experience: [],
       customResponses: {}
-    }
+    },
+    mode: 'onChange'
   });
 
   const enhancedApplyMutation = useMutation({
