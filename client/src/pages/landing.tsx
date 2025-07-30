@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ModernHero } from '@/components/ui/modern-hero';
 import { ModernCard } from '@/components/ui/modern-card';
+import { Logo } from '@/components/ui/logo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -66,29 +67,41 @@ export default function LandingPage() {
               title="Success Rate"
               description="Applications successfully submitted"
               icon={Target}
-              badge="97%"
               delay={0.1}
               interactive={true}
               className="float-animation"
-            />
+            >
+              <div className="text-center mt-4">
+                <div className="text-5xl font-bold gradient-text mb-2">97%</div>
+                <p className="text-sm text-muted-foreground">Successfully Submitted</p>
+              </div>
+            </ModernCard>
             <ModernCard
               title="Time Saved"
               description="Average time saved per application"
               icon={Clock}
-              badge="15 min"
               delay={0.2}
               interactive={true}
               className="float-delayed"
-            />
+            >
+              <div className="text-center mt-4">
+                <div className="text-5xl font-bold gradient-text mb-2">15<span className="text-2xl">min</span></div>
+                <p className="text-sm text-muted-foreground">Average Per Application</p>
+              </div>
+            </ModernCard>
             <ModernCard
               title="Accuracy"
               description="Form filling accuracy rate"
               icon={Shield}
-              badge="99%"
               delay={0.3}
               interactive={true}
               className="float-slow"
-            />
+            >
+              <div className="text-center mt-4">
+                <div className="text-5xl font-bold gradient-text mb-2">99%</div>
+                <p className="text-sm text-muted-foreground">Form Filling Accuracy</p>
+              </div>
+            </ModernCard>
           </div>
         </div>
       </section>
@@ -136,8 +149,8 @@ export default function LandingPage() {
           <div className="max-w-md mx-auto">
             <Card className="glass-card shadow-soft">
               <CardHeader className="text-center">
-                <div className="mx-auto w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl flex items-center justify-center mb-4">
-                  <LogIn className="w-6 h-6 text-primary" />
+                <div className="mx-auto mb-4">
+                  <Logo size="lg" animated={true} />
                 </div>
                 <CardTitle className="text-2xl gradient-text">Access Your Dashboard</CardTitle>
                 <CardDescription>

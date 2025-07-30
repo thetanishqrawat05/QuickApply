@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { EnhancedAutoApplyForm } from '@/components/enhanced-auto-apply-form';
 import { ApplicationLogsDashboard } from '@/components/application-logs-dashboard';
+import { Logo } from '@/components/ui/logo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -53,9 +54,7 @@ export default function AutoApplyPage() {
         <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-2xl flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
+              <Logo size="md" />
               <div>
                 <h1 className="text-xl font-bold gradient-text">Auto Job Applier</h1>
                 <p className="text-sm text-muted-foreground">AI-Powered Applications</p>
