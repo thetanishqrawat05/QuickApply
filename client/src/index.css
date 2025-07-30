@@ -243,6 +243,8 @@
   /* Fade in animations */
   .fade-in-up {
     animation: fadeInUp 0.8s var(--animation-spring) forwards;
+    opacity: 0;
+    transform: translateY(30px);
   }
 
   .stagger-1 { animation-delay: 0.1s; }
@@ -250,6 +252,13 @@
   .stagger-3 { animation-delay: 0.3s; }
   .stagger-4 { animation-delay: 0.4s; }
   .stagger-5 { animation-delay: 0.5s; }
+
+  /* Form focus enhancements */
+  .focus-enhanced:focus {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-glow);
+    transition: all 0.2s var(--animation-elastic);
+  }
 
   /* Shadow variations */
   .shadow-soft { box-shadow: var(--shadow-soft); }
