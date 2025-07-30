@@ -157,9 +157,9 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
         </div>
       </div>
 
-      <div className="glass-card rounded-2xl p-6">
+      <div className="glass-card rounded-2xl p-6 fade-in-up stagger-1">
         <div className="flex items-center space-x-3">
-          <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+          <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 pulse-glow">
             <Sparkles className="h-5 w-5 text-primary" />
           </div>
           <div>
@@ -570,12 +570,12 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
               type="submit"
               size="lg"
               disabled={!resumeFile || enhancedApplyMutation.isPending}
-              className="w-full max-w-md"
+              className="w-full max-w-md gradient-primary shadow-soft hover:shadow-medium transition-all duration-200 interactive-scale"
             >
               {enhancedApplyMutation.isPending ? (
                 <>
                   <Clock className="h-4 w-4 mr-2 animate-spin" />
-                  Starting Enhanced Auto-Apply...
+                  Starting Application Process...
                 </>
               ) : (
                 <>

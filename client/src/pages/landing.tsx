@@ -69,6 +69,7 @@ export default function LandingPage() {
               badge="97%"
               delay={0.1}
               interactive={true}
+              className="float-animation"
             />
             <ModernCard
               title="Time Saved"
@@ -77,6 +78,7 @@ export default function LandingPage() {
               badge="15 min"
               delay={0.2}
               interactive={true}
+              className="float-delayed"
             />
             <ModernCard
               title="Accuracy"
@@ -85,6 +87,7 @@ export default function LandingPage() {
               badge="99%"
               delay={0.3}
               interactive={true}
+              className="float-slow"
             />
           </div>
         </div>
@@ -103,23 +106,23 @@ export default function LandingPage() {
           </div>
           
           <div className="flex flex-wrap justify-center gap-4 mb-16">
-            <Badge variant="secondary" className="flex items-center gap-2 px-4 py-2 text-sm">
+            <Badge variant="secondary" className="flex items-center gap-2 px-4 py-2 text-sm interactive-scale fade-in-up">
               <Brain className="h-4 w-4" />
               Google Gemini AI
             </Badge>
-            <Badge variant="secondary" className="flex items-center gap-2 px-4 py-2 text-sm">
+            <Badge variant="secondary" className="flex items-center gap-2 px-4 py-2 text-sm interactive-scale fade-in-up stagger-1">
               <Key className="h-4 w-4" />
               JWT Security
             </Badge>
-            <Badge variant="secondary" className="flex items-center gap-2 px-4 py-2 text-sm">
+            <Badge variant="secondary" className="flex items-center gap-2 px-4 py-2 text-sm interactive-scale fade-in-up stagger-2">
               <Camera className="h-4 w-4" />
               Playwright Automation
             </Badge>
-            <Badge variant="secondary" className="flex items-center gap-2 px-4 py-2 text-sm">
+            <Badge variant="secondary" className="flex items-center gap-2 px-4 py-2 text-sm interactive-scale fade-in-up stagger-3">
               <Mail className="h-4 w-4" />
               Email Integration
             </Badge>
-            <Badge variant="secondary" className="flex items-center gap-2 px-4 py-2 text-sm">
+            <Badge variant="secondary" className="flex items-center gap-2 px-4 py-2 text-sm interactive-scale fade-in-up stagger-4">
               <MessageSquare className="h-4 w-4" />
               WhatsApp Notifications
             </Badge>
@@ -169,7 +172,7 @@ export default function LandingPage() {
                   </div>
                   <Button 
                     type="submit" 
-                    className="w-full gradient-primary shadow-soft hover:shadow-medium transition-all duration-200"
+                    className="w-full gradient-primary shadow-soft hover:shadow-medium transition-all duration-200 interactive-scale"
                   >
                     <span className="flex items-center justify-center gap-2">
                       Access Dashboard

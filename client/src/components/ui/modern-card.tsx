@@ -28,16 +28,21 @@ export function ModernCard({
   interactive = false
 }: ModernCardProps) {
   const cardVariants = {
-    hidden: { opacity: 0, y: 20, scale: 0.95 },
+    hidden: { 
+      opacity: 0, 
+      y: 60,
+      scale: 0.8
+    },
     visible: { 
       opacity: 1, 
-      y: 0, 
+      y: 0,
       scale: 1,
       transition: {
-        duration: 0.6,
+        duration: 0.8,
         delay,
         type: "spring",
-        stiffness: 100
+        stiffness: 100,
+        damping: 12
       }
     }
   };

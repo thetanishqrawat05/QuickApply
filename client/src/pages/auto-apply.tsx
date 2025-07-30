@@ -70,7 +70,7 @@ export default function AutoApplyPage() {
                 variant="outline" 
                 size="sm" 
                 onClick={handleLogout}
-                className="glass-card border-0"
+                className="glass-card border-0 interactive-scale"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
@@ -85,12 +85,12 @@ export default function AutoApplyPage() {
         {!applicationStarted ? (
           <div className="space-y-8">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-8 glass-card shadow-soft">
-                <TabsTrigger value="apply" className="flex items-center gap-2">
+              <TabsList className="grid w-full grid-cols-2 mb-8 glass-card shadow-soft interactive-scale">
+                <TabsTrigger value="apply" className="flex items-center gap-2 transition-all duration-200">
                   <Plus className="h-4 w-4" />
                   New Application
                 </TabsTrigger>
-                <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                <TabsTrigger value="dashboard" className="flex items-center gap-2 transition-all duration-200">
                   <BarChart3 className="h-4 w-4" />
                   Dashboard & Logs
                 </TabsTrigger>
@@ -207,7 +207,7 @@ export default function AutoApplyPage() {
 
                 <Button 
                   onClick={startNewApplication}
-                  className="w-full gradient-primary shadow-soft hover:shadow-medium transition-all duration-200"
+                  className="w-full gradient-primary shadow-soft hover:shadow-medium transition-all duration-200 interactive-scale"
                 >
                   Start New Application
                 </Button>

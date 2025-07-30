@@ -39,6 +39,7 @@
   --animation-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
   --animation-smooth: cubic-bezier(0.4, 0, 0.2, 1);
   --animation-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --animation-elastic: cubic-bezier(0.68, -0.6, 0.32, 1.6);
 }
 
 .dark {
@@ -82,6 +83,75 @@
   }
 }
 
+@keyframes gradient-flow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: var(--shadow-soft);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: var(--shadow-glow);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @layer components {
   /* Modern gradient text */
   .gradient-text {
@@ -108,6 +178,11 @@
     animation-delay: -4s;
   }
 
+  /* Pulse animation for loading states */
+  .pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
   /* Glass morphism effect */
   .glass-card {
     background: var(--gradient-card);
@@ -118,10 +193,69 @@
   }
 
   .glass-card:hover {
-    transform: translateY(-8px);
+    transform: translateY(-8px) scale(1.02);
     box-shadow: var(--shadow-strong);
     border-color: rgba(255, 255, 255, 0.3);
   }
+
+  /* Interactive scale animation */
+  .interactive-scale {
+    transition: all 0.2s var(--animation-elastic);
+  }
+
+  .interactive-scale:hover {
+    transform: scale(1.05);
+  }
+
+  .interactive-scale:active {
+    transform: scale(0.98);
+    transition-duration: 0.1s;
+  }
+
+  /* Gradient button animation */
+  .gradient-primary {
+    background: var(--gradient-primary);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s var(--animation-smooth);
+  }
+
+  .gradient-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+  }
+
+  .gradient-primary:hover::before {
+    left: 100%;
+  }
+
+  .gradient-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* Fade in animations */
+  .fade-in-up {
+    animation: fadeInUp 0.8s var(--animation-spring) forwards;
+  }
+
+  .stagger-1 { animation-delay: 0.1s; }
+  .stagger-2 { animation-delay: 0.2s; }
+  .stagger-3 { animation-delay: 0.3s; }
+  .stagger-4 { animation-delay: 0.4s; }
+  .stagger-5 { animation-delay: 0.5s; }
+
+  /* Shadow variations */
+  .shadow-soft { box-shadow: var(--shadow-soft); }
+  .shadow-medium { box-shadow: var(--shadow-medium); }
+  .shadow-strong { box-shadow: var(--shadow-strong); }
+  .shadow-glow { box-shadow: var(--shadow-glow); }
 
   /* Modern button styles */
   .btn-primary {
