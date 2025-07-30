@@ -84,6 +84,29 @@ export class ScreenshotService {
     }
   }
 
+  async captureScreenshot(page: Page, sessionId: string, type: string): Promise<string> {
+    try {
+      await this.ensureUploadsDir();
+      
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `${type}_${sessionId}_${timestamp}.png`;
+      const filepath = path.join(this.uploadsDir, filename);
+
+      await page.screenshot({
+        path: filepath,
+        fullPage: true,
+        quality: 90
+      });
+
+      console.log(`📸 Screenshot saved: ${filepath}`);
+      return filepath;
+
+    } catch (error) {
+      console.error('Screenshot capture error:', error);
+      throw new Error('Failed to capture screenshot: ' + (error as Error).message);
+    }
+  }
+
   async captureErrorScreenshot(page: Page, sessionId: string, error: string): Promise<string> {
     try {
       await this.ensureUploadsDir();

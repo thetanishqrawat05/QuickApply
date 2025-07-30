@@ -61,6 +61,107 @@ export class EmailService {
     }
   }
 
+  async sendJobApplicationReview(
+    email: string,
+    jobTitle: string,
+    companyName: string,
+    approvalUrl: string,
+    rejectUrl: string
+  ): Promise<boolean> {
+    try {
+      // Skip email sending if credentials not configured
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.warn('⚠️ Email credentials not configured. Skipping review email.');
+        console.log(`🔗 Manual approval URL: ${approvalUrl}`);
+        return true; // Return true to continue workflow
+      }
+
+      const subject = `📝 Job Application Ready for Review - ${jobTitle} at ${companyName}`;
+      
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Job Application Review</title>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; }
+            .approval-section { background: white; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; }
+            .approve-btn { 
+              display: inline-block; 
+              background: #10b981; 
+              color: white; 
+              padding: 15px 30px; 
+              text-decoration: none; 
+              border-radius: 8px; 
+              font-weight: bold;
+              margin: 10px;
+            }
+            .reject-btn { 
+              display: inline-block; 
+              background: #ef4444; 
+              color: white; 
+              padding: 15px 30px; 
+              text-decoration: none; 
+              border-radius: 8px; 
+              font-weight: bold;
+              margin: 10px;
+            }
+            .footer { background: #1f2937; color: white; padding: 15px; text-align: center; border-radius: 0 0 8px 8px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🚀 Job Application Ready for Review</h1>
+              <p>${jobTitle} at ${companyName}</p>
+            </div>
+            
+            <div class="content">
+              <p>Your job application has been automatically filled and is ready for submission.</p>
+              <p><strong>Please review and choose one of the following actions:</strong></p>
+            </div>
+
+            <div class="approval-section">
+              <h3>Ready to Submit?</h3>
+              <p>If everything looks correct, click "Approve & Submit" to submit your application.</p>
+              
+              <a href="${approvalUrl}" class="approve-btn">✅ Approve & Submit</a>
+              <a href="${rejectUrl}" class="reject-btn">❌ Cancel Application</a>
+              
+              <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">
+                ⏰ Auto-submit in 16 seconds if no response
+              </p>
+            </div>
+
+            <div class="footer">
+              <p>Auto Job Applier - Manual Login Automation</p>
+              <p style="font-size: 12px;">Generated on ${new Date().toLocaleString()}</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      await this.transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject,
+        html: htmlContent,
+      });
+
+      console.log('✅ Job application review email sent successfully to:', email);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to send job application review email:', error);
+      return false;
+    }
+  }
+
   async sendConfirmationEmail(session: ApplicationSessionRecord, success: boolean): Promise<boolean> {
     try {
       // Skip email sending if credentials not configured

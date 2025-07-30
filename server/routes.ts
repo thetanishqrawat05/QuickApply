@@ -8,6 +8,7 @@ import { MockAutomationService } from "./services/mock-automation";
 import { AutoApplyWorkflowService } from "./services/auto-apply-workflow";
 import { EnhancedAutoApplyWorkflowService } from "./services/enhanced-auto-apply-workflow";
 import { RealApplicationService } from "./services/real-application-service";
+import { ManualLoginAutomationService } from "./services/manual-login-automation";
 import { storage } from "./storage";
 
 const upload = multer({
@@ -32,6 +33,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const autoApplyWorkflowService = new AutoApplyWorkflowService();
   const enhancedAutoApplyWorkflowService = new EnhancedAutoApplyWorkflowService();
   const realApplicationService = new RealApplicationService();
+  const manualLoginAutomationService = new ManualLoginAutomationService();
 
   // User management routes
   app.post("/api/users", async (req, res) => {
@@ -867,6 +869,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get sessions error:", error);
       res.status(500).json({ message: "Failed to get sessions" });
+    }
+  });
+
+  // Manual Login Automation Routes - New improved workflow
+  app.post("/api/manual-login-apply", upload.fields([
+    { name: 'resumeFile', maxCount: 1 },
+    { name: 'coverLetterFile', maxCount: 1 }
+  ]), async (req, res) => {
+    try {
+      const profileData = JSON.parse(req.body.profile);
+      const validationResult = comprehensiveProfileSchema.safeParse(profileData);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid profile data",
+          errors: validationResult.error.errors
+        });
+      }
+
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const resumeFile = files?.resumeFile?.[0]?.buffer;
+      const coverLetterFile = files?.coverLetterFile?.[0]?.buffer;
+
+      const request = {
+        jobUrl: req.body.jobUrl,
+        profile: validationResult.data,
+        resumeFile,
+        coverLetterFile
+      };
+
+      const result = await manualLoginAutomationService.startJobApplication(request);
+      res.json(result);
+    } catch (error) {
+      console.error("Manual login application error:", error);
+      res.status(500).json({ 
+        message: "Failed to start application",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Approve submission from email/WhatsApp
+  app.get("/api/approve-submission/:sessionId", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const result = await manualLoginAutomationService.approveSubmission(sessionId);
+      
+      const statusEmoji = result.success ? '✅' : '❌';
+      const statusText = result.success ? 'Application Submitted!' : 'Submission Failed';
+      
+      res.send(`
+        <html>
+          <head>
+            <title>Application Submission</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                text-align: center; 
+                padding: 50px; 
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              .container {
+                background: rgba(255, 255, 255, 0.95);
+                color: #333;
+                padding: 40px;
+                border-radius: 15px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                max-width: 500px;
+              }
+              .icon { font-size: 4rem; margin-bottom: 20px; }
+              h1 { margin: 0 0 20px 0; color: #333; }
+              p { font-size: 1.1rem; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="icon">${statusEmoji}</div>
+              <h1>${statusText}</h1>
+              <p>${result.message}</p>
+              <p style="margin-top: 30px; font-size: 0.9rem; color: #666;">
+                You can safely close this window.
+              </p>
+            </div>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("Approve submission error:", error);
+      res.status(500).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>❌ Error</h1>
+            <p>Failed to approve submission: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  // Reject submission from email/WhatsApp
+  app.get("/api/reject-submission/:sessionId", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const result = await manualLoginAutomationService.rejectSubmission(sessionId);
+      
+      res.send(`
+        <html>
+          <head>
+            <title>Application Cancelled</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                text-align: center; 
+                padding: 50px; 
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                color: white;
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              .container {
+                background: rgba(255, 255, 255, 0.95);
+                color: #333;
+                padding: 40px;
+                border-radius: 15px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                max-width: 500px;
+              }
+              .icon { font-size: 4rem; margin-bottom: 20px; }
+              h1 { margin: 0 0 20px 0; color: #333; }
+              p { font-size: 1.1rem; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="icon">❌</div>
+              <h1>Application Cancelled</h1>
+              <p>${result.message}</p>
+              <p style="margin-top: 30px; font-size: 0.9rem; color: #666;">
+                You can safely close this window.
+              </p>
+            </div>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("Reject submission error:", error);
+      res.status(500).send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>❌ Error</h1>
+            <p>Failed to reject submission: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+          </body>
+        </html>
+      `);
     }
   });
 
