@@ -566,6 +566,98 @@ export class EmailService {
     `;
   }
 
+  async sendApplicationConfirmation(params: {
+    userEmail: string;
+    userName: string;
+    jobTitle: string;
+    company: string;
+    jobUrl: string;
+    status: 'submitted' | 'failed';
+    sessionId: string;
+  }): Promise<boolean> {
+    const subject = params.status === 'submitted' 
+      ? `✅ Application Submitted - ${params.jobTitle} at ${params.company}`
+      : `❌ Application Failed - ${params.jobTitle} at ${params.company}`;
+
+    const htmlContent = this.generateApplicationConfirmationEmailHTML(params);
+
+    return await this.sendCustomEmail(params.userEmail, subject, htmlContent);
+  }
+
+  private generateApplicationConfirmationEmailHTML(params: {
+    userEmail: string;
+    userName: string;
+    jobTitle: string;
+    company: string;
+    jobUrl: string;
+    status: 'submitted' | 'failed';
+    sessionId: string;
+  }): string {
+    const isSuccess = params.status === 'submitted';
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Application ${isSuccess ? 'Submitted' : 'Failed'}</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { 
+            background: ${isSuccess ? '#10b981' : '#ef4444'}; 
+            color: white; 
+            padding: 20px; 
+            text-align: center; 
+            border-radius: 8px 8px 0 0; 
+          }
+          .content { background: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; }
+          .footer { background: #1f2937; color: white; padding: 15px; text-align: center; border-radius: 0 0 8px 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>${isSuccess ? '✅' : '❌'} Application ${isSuccess ? 'Submitted Successfully' : 'Failed'}</h1>
+            <p>${params.jobTitle} at ${params.company}</p>
+          </div>
+          
+          <div class="content">
+            <p>Hi ${params.userName},</p>
+            
+            ${isSuccess ? `
+              <p>Great news! Your job application has been successfully submitted.</p>
+              <p><strong>What happens next:</strong></p>
+              <ul>
+                <li>The employer will review your application</li>
+                <li>You may receive a confirmation email from the company</li>
+                <li>Keep an eye on your email for next steps</li>
+              </ul>
+            ` : `
+              <p>Unfortunately, there was an issue submitting your application.</p>
+              <p>You can try applying manually at: <a href="${params.jobUrl}" target="_blank">Apply Here</a></p>
+            `}
+            
+            <p><strong>Application Details:</strong></p>
+            <ul>
+              <li><strong>Position:</strong> ${params.jobTitle}</li>
+              <li><strong>Company:</strong> ${params.company}</li>
+              <li><strong>Session ID:</strong> ${params.sessionId}</li>
+              <li><strong>Status:</strong> ${isSuccess ? 'Successfully Submitted' : 'Failed'}</li>
+            </ul>
+          </div>
+
+          <div class="footer">
+            <p>Auto Job Applier - Application Status Update</p>
+            <p style="font-size: 12px;">Generated on ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
   private generateManualLoginEmailHTML(params: {
     userEmail: string;
     userName: string;

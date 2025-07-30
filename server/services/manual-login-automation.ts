@@ -180,14 +180,30 @@ export class ManualLoginAutomationService {
     const session = this.activeSessions.get(sessionId);
     if (!session) return;
 
+    let checkCount = 0;
+    const maxChecks = 60; // Maximum 3 minutes of monitoring (60 * 3 seconds)
+
     const checkLogin = async () => {
       try {
-        const loginSuccess = await this.verifyLoginSuccess(session.page);
+        // Stop if session no longer exists or is already processed
+        const currentSession = this.activeSessions.get(sessionId);
+        if (!currentSession || currentSession.loginVerified) {
+          console.log('🛑 Stopping login monitoring - session processed');
+          return;
+        }
+
+        checkCount++;
+        if (checkCount > maxChecks) {
+          console.log('⏰ Login monitoring timeout - stopping checks');
+          return;
+        }
+
+        const loginSuccess = await this.verifyLoginSuccess(currentSession.page);
         
         if (loginSuccess) {
           console.log('✅ Login detected! Proceeding with application...');
-          session.isLoggedIn = true;
-          session.loginVerified = true;
+          currentSession.isLoggedIn = true;
+          currentSession.loginVerified = true;
           
           // Update session status
           await storage.updateApplicationSession(sessionId, {
@@ -199,16 +215,17 @@ export class ManualLoginAutomationService {
           return;
         }
         
-        // Check again in 3 seconds if not logged in
-        setTimeout(checkLogin, 3000);
+        // Continue monitoring if not logged in yet
+        setTimeout(checkLogin, 5000); // Increased interval to 5 seconds
         
       } catch (error) {
         console.error('Error monitoring login status:', error);
+        // Don't continue monitoring on errors
       }
     };
 
-    // Start monitoring
-    setTimeout(checkLogin, 3000);
+    // Start monitoring after 5 seconds
+    setTimeout(checkLogin, 5000);
   }
 
   private async proceedWithApplication(sessionId: string): Promise<{
@@ -424,12 +441,50 @@ export class ManualLoginAutomationService {
 
       if (submissionVerified) {
         console.log('✅ Application submitted successfully!');
+        
+        // Send success confirmation email
+        try {
+          const sessionData = await storage.getApplicationSession(sessionId);
+          if (sessionData?.profileData) {
+            await this.emailService.sendApplicationConfirmation({
+              userEmail: (sessionData.profileData as any).email,
+              userName: (sessionData.profileData as any).name,
+              jobTitle: session.jobDetails.title,
+              company: session.jobDetails.company,
+              jobUrl: sessionData.jobUrl,
+              status: 'submitted',
+              sessionId
+            });
+          }
+        } catch (emailError) {
+          console.log('Confirmation email failed:', emailError);
+        }
+        
         return {
           success: true,
           message: 'Application submitted successfully!'
         };
       } else {
         console.log('❌ Application submission may have failed');
+        
+        // Send failure notification email
+        try {
+          const sessionData = await storage.getApplicationSession(sessionId);
+          if (sessionData?.profileData) {
+            await this.emailService.sendApplicationConfirmation({
+              userEmail: (sessionData.profileData as any).email,
+              userName: (sessionData.profileData as any).name,
+              jobTitle: session.jobDetails.title,
+              company: session.jobDetails.company,
+              jobUrl: sessionData.jobUrl,
+              status: 'failed',
+              sessionId
+            });
+          }
+        } catch (emailError) {
+          console.log('Failure notification email failed:', emailError);
+        }
+        
         return {
           success: false,
           message: 'Application submission could not be verified'
@@ -508,25 +563,75 @@ export class ManualLoginAutomationService {
         'a:has-text("Logout")',
         'a:has-text("Sign out")',
         '.dashboard',
-        '.user-name'
+        '.user-name',
+        // Google-specific indicators
+        '.gb_pc', // Google profile circle
+        '.gb_Aa', // Google account menu
+        '[aria-label*="Account"]',
+        '[data-ved]' // Google search results page (logged in)
       ];
 
       for (const selector of loggedInIndicators) {
-        const element = await page.$(selector);
-        if (element) {
-          const isVisible = await element.isVisible();
-          if (isVisible) {
-            return true;
+        try {
+          const element = await page.$(selector);
+          if (element) {
+            const isVisible = await element.isVisible();
+            if (isVisible) {
+              console.log(`✅ Login verified with indicator: ${selector}`);
+              return true;
+            }
           }
+        } catch (e) {
+          // Continue checking other indicators
         }
       }
 
-      // Check if still on login page
-      const stillOnLogin = await this.detectLoginRequirement(page);
-      return !stillOnLogin;
+      // Check URL changes that indicate successful login
+      const currentUrl = page.url();
+      if (
+        currentUrl.includes('/jobs/') || 
+        currentUrl.includes('/careers/') || 
+        currentUrl.includes('/apply/') ||
+        currentUrl.includes('/application/') ||
+        (currentUrl.includes('google.com') && !currentUrl.includes('accounts.google.com'))
+      ) {
+        console.log('✅ Login verified by URL change');
+        return true;
+      }
+
+      // Check if login forms are no longer visible (opposite of login detection)
+      const loginFormsVisible = await this.checkLoginFormsVisible(page);
+      return !loginFormsVisible;
 
     } catch (error) {
       console.log('Error verifying login success:', error);
+      return false;
+    }
+  }
+
+  private async checkLoginFormsVisible(page: Page): Promise<boolean> {
+    try {
+      const loginSelectors = [
+        'input[type="email"]',
+        'input[type="password"]',
+        'button:has-text("Sign in")',
+        'button:has-text("Log in")',
+        '.login-form'
+      ];
+
+      for (const selector of loginSelectors) {
+        try {
+          const element = await page.$(selector);
+          if (element && await element.isVisible()) {
+            return true;
+          }
+        } catch (e) {
+          // Continue checking
+        }
+      }
+      
+      return false;
+    } catch (error) {
       return false;
     }
   }
