@@ -335,6 +335,33 @@ export class EmailService {
     `;
   }
 
+  async sendCustomEmail(
+    email: string,
+    subject: string,
+    htmlContent: string
+  ): Promise<boolean> {
+    try {
+      // Skip email sending if credentials not configured
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.warn('⚠️ Email credentials not configured. Skipping custom email.');
+        return true; // Return true to continue workflow
+      }
+
+      await this.transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject,
+        html: htmlContent,
+      });
+
+      console.log('✅ Custom email sent successfully to:', email);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to send custom email:', error);
+      return false;
+    }
+  }
+
   private generateConfirmationEmailHTML(session: ApplicationSessionRecord, success: boolean): string {
     const profile = session.profileData as ComprehensiveProfile;
     

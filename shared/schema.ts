@@ -223,6 +223,21 @@ export const applicationLogs = pgTable('application_logs', {
   notes: text('notes'),
 });
 
+export const loginSessions = pgTable('login_sessions', {
+  id: varchar('id', { length: 36 }).primaryKey(), // loginToken
+  sessionId: varchar('session_id', { length: 36 }).references(() => applicationSessions.id).notNull(),
+  portalName: varchar('portal_name', { length: 255 }).notNull(),
+  loginUrl: text('login_url').notNull(),
+  jobUrl: text('job_url').notNull(),
+  userEmail: varchar('user_email', { length: 255 }).notNull(),
+  status: varchar('status', { length: 50 }).notNull().default('pending'),
+  authMethod: varchar('auth_method', { length: 50 }).notNull(),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  authenticatedAt: timestamp('authenticated_at'),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   jobApplications: many(jobApplications),
@@ -243,6 +258,14 @@ export const applicationSessionsRelations = relations(applicationSessions, ({ on
     references: [users.id],
   }),
   logs: many(applicationLogs),
+  loginSessions: many(loginSessions),
+}));
+
+export const loginSessionsRelations = relations(loginSessions, ({ one }) => ({
+  applicationSession: one(applicationSessions, {
+    fields: [loginSessions.sessionId],
+    references: [applicationSessions.id],
+  }),
 }));
 
 export const applicationLogsRelations = relations(applicationLogs, ({ one }) => ({
@@ -265,6 +288,8 @@ export type ApplicationSessionRecord = typeof applicationSessions.$inferSelect;
 export type InsertApplicationSession = typeof applicationSessions.$inferInsert;
 export type ApplicationLogRecord = typeof applicationLogs.$inferSelect;
 export type InsertApplicationLog = typeof applicationLogs.$inferInsert;
+export type LoginSessionRecord = typeof loginSessions.$inferSelect;
+export type InsertLoginSession = typeof loginSessions.$inferInsert;
 
 // Insert Schemas for Validation  
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });

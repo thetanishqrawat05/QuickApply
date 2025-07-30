@@ -3,6 +3,7 @@ import {
   jobApplications, 
   applicationSessions,
   applicationLogs,
+  loginSessions,
   type User, 
   type InsertUser, 
   type JobApplicationRecord, 
@@ -10,7 +11,9 @@ import {
   type ApplicationSessionRecord,
   type InsertApplicationSession,
   type ApplicationLogRecord,
-  type InsertApplicationLog
+  type InsertApplicationLog,
+  type LoginSessionRecord,
+  type InsertLoginSession
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, lt } from "drizzle-orm";
@@ -41,6 +44,13 @@ export interface IStorage {
   createApplicationLog(insertLog: InsertApplicationLog): Promise<ApplicationLogRecord>;
   getApplicationLogsByUser(userId: number): Promise<ApplicationLogRecord[]>;
   getApplicationLogsBySession(sessionId: string): Promise<ApplicationLogRecord[]>;
+  
+  // Login session operations
+  createLoginSession(insertLoginSession: InsertLoginSession): Promise<LoginSessionRecord>;
+  getLoginSessionByToken(token: string): Promise<LoginSessionRecord | undefined>;
+  getLoginSessionsByUser(userEmail: string): Promise<LoginSessionRecord[]>;
+  updateLoginSession(token: string, data: Partial<InsertLoginSession>): Promise<LoginSessionRecord>;
+  deleteExpiredLoginSessions(): Promise<void>;
   
   // Temporary data operations (for automation sessions)
   getTemporaryData(id: string): Promise<any>;
@@ -179,6 +189,41 @@ export class DatabaseStorage implements IStorage {
 
   async getApplicationLogsBySession(sessionId: string): Promise<ApplicationLogRecord[]> {
     return await db.select().from(applicationLogs).where(eq(applicationLogs.sessionId, sessionId)).orderBy(desc(applicationLogs.timestamp));
+  }
+
+  // Login session methods
+  async createLoginSession(insertLoginSession: InsertLoginSession): Promise<LoginSessionRecord> {
+    const [session] = await db
+      .insert(loginSessions)
+      .values(insertLoginSession)
+      .returning();
+    return session;
+  }
+
+  async getLoginSessionByToken(token: string): Promise<LoginSessionRecord | undefined> {
+    const [session] = await db.select().from(loginSessions).where(eq(loginSessions.id, token));
+    return session || undefined;
+  }
+
+  async getLoginSessionsByUser(userEmail: string): Promise<LoginSessionRecord[]> {
+    return db
+      .select()
+      .from(loginSessions)
+      .where(eq(loginSessions.userEmail, userEmail))
+      .orderBy(desc(loginSessions.createdAt));
+  }
+
+  async updateLoginSession(token: string, data: Partial<InsertLoginSession>): Promise<LoginSessionRecord> {
+    const [session] = await db
+      .update(loginSessions)
+      .set(data)
+      .where(eq(loginSessions.id, token))
+      .returning();
+    return session;
+  }
+
+  async deleteExpiredLoginSessions(): Promise<void> {
+    await db.delete(loginSessions).where(lt(loginSessions.expiresAt, new Date()));
   }
 }
 
