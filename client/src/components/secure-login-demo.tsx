@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Mail, MessageSquare, Shield, ExternalLink } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SystemStatus } from '@/components/system-status';
 
 interface LoginSession {
   id: string;
@@ -109,11 +110,16 @@ export function SecureLoginDemo() {
         </p>
       </div>
 
-      <Tabs defaultValue="create" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs defaultValue="status" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="status">System Status</TabsTrigger>
           <TabsTrigger value="create">Create Login Link</TabsTrigger>
           <TabsTrigger value="dashboard">Login Dashboard</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="status" className="space-y-6">
+          <SystemStatus />
+        </TabsContent>
 
         <TabsContent value="create" className="space-y-6">
           <Card>

@@ -1234,6 +1234,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // System info and health endpoints
+  app.get("/api/system-info", (req, res) => {
+    const status = {
+      database: !!process.env.DATABASE_URL,
+      email: !!(process.env.EMAIL_USER && process.env.EMAIL_PASS),
+      ai: !!process.env.GEMINI_API_KEY,
+      whatsapp: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
+      jwt: !!process.env.JWT_SECRET
+    };
+
+    res.json({
+      status,
+      configured: status.database && status.email && status.ai,
+      features: {
+        jobApplication: true,
+        aiCoverLetters: status.ai,
+        emailNotifications: status.email,
+        whatsappNotifications: status.whatsapp,
+        secureLogin: status.jwt,
+        browserAutomation: true
+      }
+    });
+  });
+
+  app.get("/api/health", (req, res) => {
+    res.json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      version: "1.0.0",
+      environment: process.env.NODE_ENV || "development"
+    });
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
