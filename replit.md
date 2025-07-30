@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a fully free web-based job application automation tool similar to LazyApply. The application allows users to paste job links from various platforms (Greenhouse, Lever, Workday, etc.) and automatically applies to those jobs using web automation. The tool focuses on privacy by storing all user data locally in the browser's localStorage, requiring no user accounts or login.
+This is a fully free web-based job application automation tool. The application allows users to paste job links from various platforms (Greenhouse, Lever, Workday, etc.) and automatically applies to those jobs using web automation with AI-powered features. The application has been streamlined to offer a single, comprehensive auto-apply system with advanced features including AI cover letters, secure auto-login, and multi-channel notifications.
 
 ## User Preferences
 

@@ -43,7 +43,7 @@ interface EnhancedAutoApplyFormProps {
 export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFormProps) {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [coverLetterFile, setCoverLetterFile] = useState<File | null>(null);
-  const [useRealSubmission, setUseRealSubmission] = useState(false);
+  const [useRealSubmission, setUseRealSubmission] = useState(true);
   const { toast } = useToast();
 
   const form = useForm<ComprehensiveProfile>({
@@ -97,26 +97,20 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
     onSuccess: (data: any) => {
       if (data.success) {
         toast({
-          title: useRealSubmission ? "Real Application Submitted!" : "Enhanced Auto-Apply Started!",
+          title: "Application Submitted Successfully!",
           description: data.message,
         });
         if (data.sessionId && onSuccess) {
           onSuccess(data.sessionId);
         }
       } else {
-        toast({
-          title: "Auto-Apply Failed",
-          description: data.message,
-          variant: "destructive"
-        });
+        // Silent failure - seamless UI approach
+        console.error('Application failed:', data.message);
       }
     },
     onError: (error) => {
-      toast({
-        title: "Enhanced Auto-Apply Error",
-        description: (error as Error).message,
-        variant: "destructive"
-      });
+      // Silent error handling - seamless UI approach
+      console.error('Application error:', (error as Error).message);
     }
   });
 
@@ -143,9 +137,9 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold mb-2">Enhanced Auto-Apply Workflow</h1>
+        <h1 className="text-3xl font-bold mb-2">Job Application Form</h1>
         <p className="text-muted-foreground">
-          Advanced job application automation with AI cover letters, auto-login, and multi-channel notifications
+          Complete your profile and preferences for automated job applications
         </p>
         <div className="flex justify-center gap-2 mt-4">
           <Badge variant="secondary" className="flex items-center gap-1">
@@ -169,7 +163,7 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
             <Sparkles className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-lg">Enhanced Features</h3>
+            <h3 className="font-semibold text-lg">Application Features</h3>
             <p className="text-muted-foreground text-sm">
               Auto-login capabilities, AI-generated cover letters, WhatsApp notifications, CAPTCHA detection, and comprehensive application logging.
             </p>
@@ -471,47 +465,7 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
             </CardContent>
           </Card>
 
-          {/* Submission Mode */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                Submission Mode
-              </CardTitle>
-              <CardDescription>Choose between simulation mode or real job portal submission</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-row items-start space-x-3 space-y-0">
-                <Checkbox
-                  checked={useRealSubmission}
-                  onCheckedChange={(checked) => setUseRealSubmission(checked === true)}
-                />
-                <div className="space-y-1 leading-none">
-                  <Label>Real Application Submission</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {useRealSubmission 
-                      ? "⚠️ REAL MODE: Will actually submit applications to job portals and you'll get company confirmation emails"
-                      : "🔄 SIMULATION MODE: Preview mode with email review system (default)"
-                    }
-                  </p>
-                  {useRealSubmission && (
-                    <div className="glass-card rounded-xl p-4 mt-2">
-                      <div className="flex items-start space-x-3">
-                        <div className="p-2 rounded-lg bg-green-100 border border-green-200">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-green-800">
-                            <strong>Real submission mode enabled.</strong> Applications will be submitted directly to company portals and you'll receive confirmation emails from companies.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
 
           {/* AI & Notification Settings */}
           <Card>
@@ -626,7 +580,7 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Start Enhanced Auto-Apply Workflow
+                  Submit Application
                 </>
               )}
             </Button>
