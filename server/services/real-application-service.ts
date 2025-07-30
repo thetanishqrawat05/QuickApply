@@ -134,6 +134,32 @@ export class RealApplicationService {
           }
           
           console.log('✅ Auto-login successful, proceeding with application');
+        } else if (request.profile.preferredLoginMethod === 'manual') {
+          // Manual login method selected - send email for user to log in manually
+          console.log('🔐 Manual login method selected - sending email for user login');
+          
+          // Close current browser and transfer to manual login service
+          await page.close();
+          
+          // Import and use ManualLoginAutomationService
+          const { ManualLoginAutomationService } = await import('./manual-login-automation');
+          const manualLoginService = new ManualLoginAutomationService();
+          
+          // Start manual login workflow
+          const manualResult = await manualLoginService.startJobApplication({
+            jobUrl: request.jobUrl,
+            profile: request.profile,
+            resumeFile: request.resumeFile,
+            coverLetterFile: request.coverLetterFile
+          });
+          
+          return {
+            success: manualResult.success,
+            sessionId: manualResult.sessionId,
+            message: manualResult.success 
+              ? `📧 Login email sent! Check your email for a secure login link. Once you log in through the email link, the application will continue automatically.`
+              : `❌ Failed to start manual login workflow: ${manualResult.message}`
+          };
         } else {
           // Try alternative approaches without login
           console.log('🔍 Login required but no credentials provided, trying alternatives...');
@@ -143,12 +169,16 @@ export class RealApplicationService {
             return {
               success: false,
               sessionId,
-              message: `❌ This job portal requires login to submit applications. Please provide your login email and password in the form above and try again. 
+              message: `❌ This job portal requires login to submit applications. You have two options:
 
+🔑 Option 1: Provide your login credentials in the form above
 📧 Use the same email/password you normally use to sign into:
 • Google Careers (use your Google account)
 • LinkedIn Jobs (use your LinkedIn account)  
 • Company career portals (use your account for that company)
+
+📱 Option 2: Select "Manual (No Auto-Login)" in the login method dropdown
+This will send you an email with a secure login link when login is needed.
 
 🔒 Your credentials are encrypted and secure.`
             };

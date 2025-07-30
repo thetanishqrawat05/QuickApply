@@ -92,6 +92,38 @@ export class EmailService {
     }
   }
 
+  async sendManualLoginEmail(params: {
+    userEmail: string;
+    userName: string;
+    jobTitle: string;
+    company: string;
+    jobUrl: string;
+    sessionId: string;
+  }): Promise<boolean> {
+    try {
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.warn('⚠️ Email credentials not configured. Skipping manual login email.');
+        console.log(`🔗 Manual login required for job: ${params.jobUrl}`);
+        return true;
+      }
+
+      const htmlContent = this.generateManualLoginEmailHTML(params);
+
+      await this.transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: params.userEmail,
+        subject: `🔐 Login Required: ${params.jobTitle} at ${params.company}`,
+        html: htmlContent,
+      });
+
+      console.log(`✅ Manual login email sent to: ${params.userEmail}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to send manual login email:', error);
+      return false;
+    }
+  }
+
   async sendJobApplicationReview(
     email: string,
     jobTitle: string,
@@ -526,6 +558,89 @@ export class EmailService {
 
           <div class="footer">
             <p>Auto Job Applier - Secure Login Assistant</p>
+            <p style="font-size: 12px;">Generated on ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private generateManualLoginEmailHTML(params: {
+    userEmail: string;
+    userName: string;
+    jobTitle: string;
+    company: string;
+    jobUrl: string;
+    sessionId: string;
+  }): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Login Required - Job Application</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #f59e0b; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; }
+          .login-section { background: white; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; border: 2px solid #f59e0b; }
+          .login-btn { 
+            display: inline-block; 
+            background: #f59e0b; 
+            color: white; 
+            padding: 15px 30px; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            font-weight: bold;
+            margin: 10px;
+          }
+          .footer { background: #1f2937; color: white; padding: 15px; text-align: center; border-radius: 0 0 8px 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔐 Login Required</h1>
+            <p>Job Application: ${params.jobTitle} at ${params.company}</p>
+          </div>
+          
+          <div class="content">
+            <p>Hi ${params.userName},</p>
+            
+            <p>Your job application is being processed, but the job portal requires you to log in first.</p>
+            
+            <div class="login-section">
+              <h3>Action Required: Please Log In</h3>
+              <p>Click the button below to log into the job portal. Once you're logged in, we'll automatically continue with your application.</p>
+              
+              <a href="${params.jobUrl}" class="login-btn" target="_blank">🔐 Login to Apply</a>
+              
+              <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">
+                After logging in, the application will continue automatically.
+              </p>
+            </div>
+            
+            <h3>What to do:</h3>
+            <ol>
+              <li>Click the login button above</li>
+              <li>Log into the job portal using your credentials</li>
+              <li>Keep the browser tab open</li>
+              <li>The application will continue automatically</li>
+            </ol>
+            
+            <p><strong>Job Details:</strong></p>
+            <ul>
+              <li><strong>Position:</strong> ${params.jobTitle}</li>
+              <li><strong>Company:</strong> ${params.company}</li>
+              <li><strong>Session ID:</strong> ${params.sessionId}</li>
+            </ul>
+          </div>
+
+          <div class="footer">
+            <p>Auto Job Applier - Manual Login Assistant</p>
             <p style="font-size: 12px;">Generated on ${new Date().toLocaleString()}</p>
           </div>
         </div>

@@ -120,18 +120,40 @@ export class ManualLoginAutomationService {
       const requiresLogin = await this.detectLoginRequirement(page);
 
       if (requiresLogin) {
-        console.log('🔐 Login detected - waiting for user to log in manually');
+        console.log('🔐 Login detected - sending email for manual login');
         
-        // Start monitoring for login success
-        this.monitorLoginStatus(sessionId);
-        
-        return {
-          success: true,
-          sessionId,
-          message: 'Please log in manually on the job site. I will detect when you are logged in and continue with the application.',
-          requiresLogin: true,
-          browserUrl: request.jobUrl
-        };
+        // Send email notification for manual login
+        try {
+          await this.emailService.sendManualLoginEmail({
+            userEmail: request.profile.email,
+            userName: request.profile.name,
+            jobTitle: jobDetails.title,
+            company: jobDetails.company,
+            jobUrl: request.jobUrl,
+            sessionId: sessionId
+          });
+          
+          console.log('📧 Manual login email sent successfully');
+          
+          // Start monitoring for login success
+          this.monitorLoginStatus(sessionId);
+          
+          return {
+            success: true,
+            sessionId,
+            message: '📧 Login email sent! Check your email for instructions on how to log into the job portal. The application will continue automatically after you log in.',
+            requiresLogin: true,
+            browserUrl: request.jobUrl
+          };
+        } catch (error) {
+          console.error('Failed to send manual login email:', error);
+          return {
+            success: false,
+            sessionId,
+            message: 'Failed to send login notification email. Please try again.',
+            requiresLogin: true
+          };
+        }
       } else {
         console.log('✅ No login required - proceeding with form filling');
         
