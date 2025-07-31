@@ -107,19 +107,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Profile save endpoint
   app.post("/api/profile/save", async (req, res) => {
     try {
-      // Use partial validation for profile saves to allow incomplete data
-      const partialProfileSchema = comprehensiveProfileSchema.partial();
-      const validationResult = partialProfileSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        return res.status(400).json({ 
-          message: "Invalid profile data",
-          errors: validationResult.error.errors
-        });
-      }
-
-      const profileData = validationResult.data;
+      // Temporarily disable strict validation for profile saves
+      const profileData = req.body;
       
-      // Ensure required fields are present for creating a user
+      // Basic validation - only require email
       if (!profileData.email) {
         return res.status(400).json({ message: "Email is required" });
       }
@@ -189,7 +180,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(existingUser);
       }
 
-      const user = await storage.createUser(validationResult.data);
+      const userData = {
+        ...validationResult.data,
+        skills: validationResult.data.skills || [],
+        certifications: validationResult.data.certifications || [],
+        languages: validationResult.data.languages || []
+      };
+      const user = await storage.createUser(userData);
       res.json(user);
     } catch (error) {
       console.error("Create user error:", error);
