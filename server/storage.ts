@@ -125,20 +125,6 @@ export class DatabaseStorage implements IStorage {
     return application || undefined;
   }
 
-  // Temporary data for automation sessions
-  async getTemporaryData(id: string): Promise<any> {
-    return this.tempData.get(id);
-  }
-
-  async setTemporaryData(id: string, data: any): Promise<void> {
-    this.tempData.set(id, data);
-  }
-
-  async deleteTemporaryData(id: string): Promise<void> {
-    this.tempData.delete(id);
-  }
-
-  // Application session methods
   async createApplicationSession(insertSession: InsertApplicationSession): Promise<ApplicationSessionRecord> {
     const [session] = await db
       .insert(applicationSessions)
@@ -161,6 +147,14 @@ export class DatabaseStorage implements IStorage {
     return session || undefined;
   }
 
+  async getApplicationSessionsByUser(userId: number): Promise<ApplicationSessionRecord[]> {
+    return db
+      .select()
+      .from(applicationSessions)
+      .where(eq(applicationSessions.userId, userId))
+      .orderBy(desc(applicationSessions.createdAt));
+  }
+
   async updateApplicationSession(id: string, data: Partial<InsertApplicationSession>): Promise<ApplicationSessionRecord> {
     const [session] = await db
       .update(applicationSessions)
@@ -168,14 +162,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(applicationSessions.id, id))
       .returning();
     return session;
-  }
-
-  async getApplicationSessionsByUser(userId: number): Promise<ApplicationSessionRecord[]> {
-    return db
-      .select()
-      .from(applicationSessions)
-      .where(eq(applicationSessions.userId, userId))
-      .orderBy(desc(applicationSessions.createdAt));
   }
 
   async deleteExpiredSessions(): Promise<void> {
@@ -191,14 +177,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getApplicationLogsByUser(userId: number): Promise<ApplicationLogRecord[]> {
-    return await db.select().from(applicationLogs).where(eq(applicationLogs.userId, userId)).orderBy(desc(applicationLogs.timestamp));
+    return db
+      .select()
+      .from(applicationLogs)
+      .where(eq(applicationLogs.userId, userId))
+      .orderBy(desc(applicationLogs.timestamp));
   }
 
   async getApplicationLogsBySession(sessionId: string): Promise<ApplicationLogRecord[]> {
-    return await db.select().from(applicationLogs).where(eq(applicationLogs.sessionId, sessionId)).orderBy(desc(applicationLogs.timestamp));
+    return db
+      .select()
+      .from(applicationLogs)
+      .where(eq(applicationLogs.sessionId, sessionId))
+      .orderBy(desc(applicationLogs.timestamp));
   }
 
-  // Login session methods
   async createLoginSession(insertLoginSession: InsertLoginSession): Promise<LoginSessionRecord> {
     const [session] = await db
       .insert(loginSessions)
@@ -236,6 +229,15 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(loginSessions.createdAt));
   }
 
+  async updateLoginSession(token: string, data: Partial<InsertLoginSession>): Promise<LoginSessionRecord> {
+    const [session] = await db
+      .update(loginSessions)
+      .set(data)
+      .where(eq(loginSessions.secureToken, token))
+      .returning();
+    return session;
+  }
+
   async getExpiredLoginSessions(): Promise<LoginSessionRecord[]> {
     return db
       .select()
@@ -243,22 +245,11 @@ export class DatabaseStorage implements IStorage {
       .where(lt(loginSessions.expiresAt, new Date()));
   }
 
-  async updateLoginSession(token: string, data: Partial<InsertLoginSession>): Promise<LoginSessionRecord> {
-    const [session] = await db
-      .update(loginSessions)
-      .set(data)
-      .where(eq(loginSessions.id, token))
-      .returning();
-    return session;
-  }
-
   async deleteExpiredLoginSessions(): Promise<void> {
     await db.delete(loginSessions).where(lt(loginSessions.expiresAt, new Date()));
   }
 
   // Temporary data operations
-  private tempData: Map<string, any> = new Map();
-
   async getTemporaryData(id: string): Promise<any> {
     return this.tempData.get(id);
   }
@@ -355,7 +346,7 @@ export class DatabaseStorage implements IStorage {
             city: profile.city,
             state: profile.state,
             zipCode: profile.zipCode,
-            country: profile.country,
+            country: profile.country || user.country,
             linkedinProfile: profile.linkedinProfile,
             website: profile.website,
             portfolioUrl: profile.portfolioUrl,
@@ -439,33 +430,33 @@ export class DatabaseStorage implements IStorage {
         state: user.state || '',
         zipCode: user.zipCode || '',
         country: user.country || 'United States',
-        linkedinProfile: user.linkedinProfile,
-        website: user.website,
-        portfolioUrl: user.portfolioUrl,
+        linkedinProfile: user.linkedinProfile || undefined,
+        website: user.website || undefined,
+        portfolioUrl: user.portfolioUrl || undefined,
         workAuthorization: user.workAuthorization as any || 'us_citizen',
         requiresSponsorship: user.requiresSponsorship || false,
-        visaStatus: user.visaStatus,
-        desiredSalary: user.desiredSalary,
-        salaryMin: user.salaryMin,
-        salaryMax: user.salaryMax,
+        visaStatus: user.visaStatus || undefined,
+        desiredSalary: user.desiredSalary || undefined,
+        salaryMin: user.salaryMin || undefined,
+        salaryMax: user.salaryMax || undefined,
         salaryNegotiable: user.salaryNegotiable || true,
-        availableStartDate: user.availableStartDate,
-        noticePeriod: user.noticePeriod,
+        availableStartDate: user.availableStartDate || undefined,
+        noticePeriod: user.noticePeriod || undefined,
         highestDegree: user.highestDegree as any,
-        university: user.university,
-        major: user.major,
-        graduationYear: user.graduationYear,
-        gpa: user.gpa,
-        yearsOfExperience: user.yearsOfExperience,
-        currentTitle: user.currentTitle,
-        currentCompany: user.currentCompany,
-        previousTitle: user.previousTitle,
-        previousCompany: user.previousCompany,
+        university: user.university || undefined,
+        major: user.major || undefined,
+        graduationYear: user.graduationYear || undefined,
+        gpa: user.gpa || undefined,
+        yearsOfExperience: user.yearsOfExperience || undefined,
+        currentTitle: user.currentTitle || undefined,
+        currentCompany: user.currentCompany || undefined,
+        previousTitle: user.previousTitle || undefined,
+        previousCompany: user.previousCompany || undefined,
         skills: user.skills || [],
         certifications: user.certifications || [],
         languages: user.languages || [],
-        criminalBackground: user.criminalBackground,
-        drugTest: user.drugTest,
+        criminalBackground: user.criminalBackground || undefined,
+        drugTest: user.drugTest || undefined,
         backgroundCheckConsent: user.backgroundCheckConsent || true,
         race: user.race as any,
         gender: user.gender as any,
@@ -473,23 +464,23 @@ export class DatabaseStorage implements IStorage {
         disabilityStatus: user.disabilityStatus as any,
         jobType: user.jobType as any,
         workLocation: user.workLocation as any,
-        willingToRelocate: user.willingToRelocate,
-        willingToTravel: user.willingToTravel,
-        hasReferences: user.hasReferences,
-        referenceContactInfo: user.referenceContactInfo,
-        whyInterested: user.whyInterested,
-        strengthsWeaknesses: user.strengthsWeaknesses,
-        careerGoals: user.careerGoals,
-        additionalInfo: user.additionalInfo,
+        willingToRelocate: user.willingToRelocate || undefined,
+        willingToTravel: user.willingToTravel || undefined,
+        hasReferences: user.hasReferences || undefined,
+        referenceContactInfo: user.referenceContactInfo || undefined,
+        whyInterested: user.whyInterested || undefined,
+        strengthsWeaknesses: user.strengthsWeaknesses || undefined,
+        careerGoals: user.careerGoals || undefined,
+        additionalInfo: user.additionalInfo || undefined,
         customResponses: user.customResponses || {},
-        whatsappNumber: user.whatsappNumber,
+        whatsappNumber: user.whatsappNumber || undefined,
         enableWhatsappNotifications: user.enableWhatsappNotifications || false,
         enableEmailNotifications: user.enableEmailNotifications || true,
         enableAICoverLetter: user.enableAICoverLetter || true,
-        coverLetterTemplate: user.coverLetterTemplate,
+        coverLetterTemplate: user.coverLetterTemplate || undefined,
         preferredLoginMethod: user.preferredLoginMethod as any || 'manual',
-        resumeFileName: user.resumeFileName,
-        coverLetterFileName: user.coverLetterFileName
+        resumeFileName: user.resumeFileName || undefined,
+        coverLetterFileName: user.coverLetterFileName || undefined
       };
     } catch (error) {
       console.error('Error getting user profile:', error);
