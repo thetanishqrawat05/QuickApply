@@ -625,8 +625,8 @@ export default function ComprehensiveProfileForm({ jobUrl, onSuccess, onError }:
               </Tabs>
 
               {/* Navigation and Submit */}
-              <div className="flex justify-between items-center pt-6 border-t">
-                <div className="flex gap-2">
+              <div className="flex flex-col space-y-4 pt-6 border-t">
+                <div className="flex flex-wrap gap-2 justify-center">
                   {tabs.map((tab, index) => (
                     <Button
                       key={tab.id}
@@ -634,31 +634,34 @@ export default function ComprehensiveProfileForm({ jobUrl, onSuccess, onError }:
                       variant={currentTab === tab.id ? "default" : "outline"}
                       size="sm"
                       onClick={() => setCurrentTab(tab.id)}
-                      className="hidden sm:flex"
+                      className="flex items-center gap-1"
                     >
-                      <tab.icon className="w-4 h-4 mr-1" />
-                      {tab.label}
+                      <tab.icon className="w-4 h-4" />
+                      <span className="hidden sm:inline">{tab.label}</span>
                     </Button>
                   ))}
                 </div>
 
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting || !resumeFile}
-                  className="bg-green-600 hover:bg-green-700 text-white px-8"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Starting Interactive Session...
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="w-4 h-4 mr-2" />
-                      Start Interactive Application
-                    </>
-                  )}
-                </Button>
+                <div className="flex justify-center">
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting || !resumeFile}
+                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg"
+                    size="lg"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Starting Interactive Session...
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-5 h-5 mr-2" />
+                        Start Interactive Application
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </form>
           </Form>

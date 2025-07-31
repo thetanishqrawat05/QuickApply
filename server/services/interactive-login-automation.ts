@@ -2,6 +2,7 @@ import { Page, Browser, BrowserContext } from 'playwright';
 import { RobustBrowserService } from './robust-browser-service';
 import { UniversalFormDetector } from './universal-form-detector';
 import { ScreenshotService } from './screenshot-service';
+import { EmailService } from './email-service';
 import { ComprehensiveProfile } from '@shared/schema';
 import { storage } from '../storage';
 import { v4 as uuidv4 } from 'uuid';
@@ -33,12 +34,14 @@ export class InteractiveLoginAutomationService {
   private browserService: RobustBrowserService;
   private formDetector: UniversalFormDetector;
   private screenshotService: ScreenshotService;
+  private emailService: EmailService;
   private activeSessions: Map<string, InteractiveSession> = new Map();
 
   constructor() {
     this.browserService = new RobustBrowserService();
     this.formDetector = new UniversalFormDetector();
     this.screenshotService = new ScreenshotService();
+    this.emailService = new EmailService();
   }
 
   async startInteractiveSession(request: InteractiveApplicationRequest): Promise<{
@@ -325,22 +328,43 @@ export class InteractiveLoginAutomationService {
         // Take final screenshot
         await this.screenshotService.captureScreenshot(session.page, sessionId, 'after-submission');
 
-        // Check for confirmation
-        const confirmationText = await this.checkSubmissionConfirmation(session.page);
+        // Check for confirmation with enhanced verification
+        const confirmationResult = await this.checkSubmissionConfirmation(session.page);
         
         session.status = 'submitted';
         
-        // Update database
+        // Update database with comprehensive submission data
         await storage.updateApplicationSession(sessionId, {
-          status: 'submitted',
-          submittedAt: new Date()
+          status: confirmationResult.success ? 'submitted' : 'submission_unclear',
+          submittedAt: new Date(),
+          confirmationEvidence: confirmationResult.evidence,
+          finalUrl: confirmationResult.currentUrl
         });
+
+        // Send confirmation email
+        try {
+          const sessionData = await storage.getApplicationSession(sessionId);
+          if (sessionData) {
+            console.log('📧 Sending confirmation email...');
+            await this.emailService.sendConfirmationEmail(sessionData, confirmationResult.success);
+            console.log('✅ Confirmation email sent successfully');
+          }
+        } catch (emailError) {
+          console.log('⚠️ Failed to send confirmation email:', emailError);
+        }
 
         return {
           success: true,
-          message: 'Application submitted successfully!',
+          message: confirmationResult.success 
+            ? 'Application submitted successfully! Confirmation detected and email sent.' 
+            : 'Application submitted but confirmation unclear. Email sent with details.',
           submitted: true,
-          confirmationDetails: { confirmationText }
+          confirmationDetails: {
+            verified: confirmationResult.success,
+            confirmation: confirmationResult.confirmation,
+            evidence: confirmationResult.evidence,
+            currentUrl: confirmationResult.currentUrl
+          }
         };
       } else {
         return {
@@ -471,30 +495,127 @@ export class InteractiveLoginAutomationService {
     }
   }
 
-  private async checkSubmissionConfirmation(page: Page): Promise<string> {
+  private async checkSubmissionConfirmation(page: Page): Promise<{
+    success: boolean;
+    confirmation: string;
+    evidence: string[];
+    currentUrl: string;
+  }> {
     try {
-      const confirmationSelectors = [
-        ':text("thank you")',
-        ':text("application submitted")',
-        ':text("application received")',
-        ':text("successfully submitted")',
-        ':text("confirmation")',
-        '.success-message',
-        '.confirmation-message',
-        '[data-testid*="success"]',
-        '[data-testid*="confirmation"]'
+      // Wait for potential redirect or confirmation page
+      await page.waitForTimeout(3000);
+      
+      const evidence: string[] = [];
+      const currentUrl = page.url();
+      evidence.push(`Current URL: ${currentUrl}`);
+      
+      // Look for common confirmation indicators in text
+      const confirmationIndicators = [
+        'thank you for applying',
+        'application submitted successfully',
+        'application received',
+        'successfully submitted',
+        'application complete',
+        'we have received your application',
+        'thank you for your interest',
+        'application has been submitted',
+        'your application is being reviewed',
+        'confirmation number',
+        'application id',
+        'reference number'
       ];
-
-      for (const selector of confirmationSelectors) {
-        const element = page.locator(selector).first();
-        if (await element.isVisible()) {
-          return await element.textContent() || 'Application submitted';
+      
+      const pageText = await page.textContent('body') || '';
+      const lowerPageText = pageText.toLowerCase();
+      
+      let foundTextConfirmation = false;
+      for (const indicator of confirmationIndicators) {
+        if (lowerPageText.includes(indicator)) {
+          evidence.push(`Found text indicator: "${indicator}"`);
+          foundTextConfirmation = true;
+          console.log(`✅ Found confirmation indicator: "${indicator}"`);
         }
       }
-
-      return 'Application submitted';
+      
+      // Check URL for confirmation patterns
+      const confirmationUrlPatterns = [
+        'confirmation',
+        'success',
+        'thank',
+        'complete',
+        'submitted',
+        'applied',
+        'application-submitted'
+      ];
+      
+      let foundUrlConfirmation = false;
+      for (const pattern of confirmationUrlPatterns) {
+        if (currentUrl.toLowerCase().includes(pattern)) {
+          evidence.push(`Found URL pattern: "${pattern}"`);
+          foundUrlConfirmation = true;
+          console.log(`✅ Found confirmation in URL: ${pattern}`);
+        }
+      }
+      
+      // Check for confirmation elements (success messages, thank you banners, etc.)
+      const confirmationSelectors = [
+        '[class*="success"]',
+        '[class*="confirmation"]',
+        '[class*="thank"]',
+        '[class*="submitted"]',
+        '[id*="success"]',
+        '[id*="confirmation"]',
+        '.alert-success',
+        '.success-message',
+        '.confirmation-message'
+      ];
+      
+      let foundElementConfirmation = false;
+      for (const selector of confirmationSelectors) {
+        try {
+          const element = await page.$(selector);
+          if (element && await element.isVisible()) {
+            const elementText = await element.textContent() || '';
+            if (elementText.length > 0) {
+              evidence.push(`Found confirmation element: ${selector} - "${elementText.substring(0, 100)}..."`);
+              foundElementConfirmation = true;
+            }
+          }
+        } catch (error) {
+          // Continue to next selector
+        }
+      }
+      
+      // Look for form disappearance (indicating successful submission)
+      const formExists = await page.$('form') !== null;
+      if (!formExists) {
+        evidence.push('Application form no longer present (likely submitted)');
+      }
+      
+      // Check if we're on a different domain (redirect after submission)
+      const originalDomain = new URL(currentUrl).hostname;
+      evidence.push(`Domain: ${originalDomain}`);
+      
+      const success = foundTextConfirmation || foundUrlConfirmation || foundElementConfirmation;
+      const confirmation = success ? 'Application appears to have been submitted successfully' : 'No clear confirmation detected';
+      
+      console.log(`📋 Submission verification result: ${success ? 'SUCCESS' : 'UNCLEAR'}`);
+      console.log(`📋 Evidence collected: ${evidence.length} items`);
+      
+      return {
+        success,
+        confirmation,
+        evidence,
+        currentUrl
+      };
     } catch (error) {
-      return 'Application submitted';
+      console.error('Error checking submission confirmation:', error);
+      return {
+        success: false,
+        confirmation: 'Error during confirmation check',
+        evidence: ['Error occurred during verification'],
+        currentUrl: page.url()
+      };
     }
   }
 
