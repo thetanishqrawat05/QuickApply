@@ -236,6 +236,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
     },
     onSuccess: (result) => {
       setAnalysisResult(result);
+      setIsAnalyzingResume(false);
       // Auto-fill form with extracted data
       if (result.extractedProfile) {
         Object.entries(result.extractedProfile).forEach(([key, value]) => {
@@ -250,6 +251,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       });
     },
     onError: (error) => {
+      setIsAnalyzingResume(false);
       toast({
         title: "Analysis Failed",
         description: (error as Error).message,
@@ -275,11 +277,13 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
 
   // Auto-load profile when email is entered
   useEffect(() => {
-    const emailValue = form.watch('email');
-    if (emailValue && emailValue.includes('@') && emailValue !== savedProfileEmail) {
-      setSavedProfileEmail(emailValue);
-    }
-  }, [form.watch('email')]);
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'email' && value.email && value.email.includes('@') && value.email !== savedProfileEmail) {
+        setSavedProfileEmail(value.email);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [savedProfileEmail]);
 
   // Load saved profile data into form
   useEffect(() => {
@@ -321,7 +325,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       // Automatically analyze resume
       setIsAnalyzingResume(true);
       analyzeResumeMutation.mutate(file);
-      setIsAnalyzingResume(false);
+      // Note: setIsAnalyzingResume(false) is handled in mutation callbacks
     }
   };
 
@@ -386,9 +390,14 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       return;
     }
 
-    // Show profile save success only on final submission
-    if (!showProfileSaveSuccess) {
-      await saveProfileMutation.mutateAsync(data);
+    // Save profile before submission (non-blocking)
+    try {
+      if (!showProfileSaveSuccess) {
+        await saveProfileMutation.mutateAsync(data);
+      }
+    } catch (error) {
+      console.warn('Profile save failed, continuing with application:', error);
+      // Continue with application even if profile save fails
     }
 
     const formData = new FormData();
