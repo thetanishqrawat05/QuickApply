@@ -107,30 +107,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Profile save endpoint
   app.post("/api/profile/save", async (req, res) => {
     try {
-      // Temporarily disable strict validation for profile saves
-      const profileData = req.body;
-      
-      // Basic validation - only require email
-      if (!profileData.email) {
-        return res.status(400).json({ message: "Email is required" });
+      const validationResult = comprehensiveProfileSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid profile data",
+          errors: validationResult.error.errors
+        });
       }
+
+      const profileData = validationResult.data;
       
       // Check if user already exists
       let user = await storage.getUserByEmail(profileData.email);
       if (user) {
-        // Update existing user with provided data
-        const updateData = { ...profileData };
-        user = await storage.updateUser(user.id, updateData);
+        // Update existing user
+        user = await storage.updateUser(user.id, profileData);
       } else {
-        // Create new user - ensure required fields are present
-        const createData = {
-          name: profileData.name || `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim() || 'New User',
-          email: profileData.email,
-          phone: profileData.phone || '',
-          countryCode: profileData.countryCode || '+1',
-          ...profileData
-        };
-        user = await storage.createUser(createData);
+        // Create new user
+        user = await storage.createUser(profileData);
       }
       
       res.json(user);
@@ -180,13 +174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(existingUser);
       }
 
-      const userData = {
-        ...validationResult.data,
-        skills: validationResult.data.skills || [],
-        certifications: validationResult.data.certifications || [],
-        languages: validationResult.data.languages || []
-      };
-      const user = await storage.createUser(userData);
+      const user = await storage.createUser(validationResult.data);
       res.json(user);
     } catch (error) {
       console.error("Create user error:", error);

@@ -82,8 +82,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
   const queryClient = useQueryClient();
 
   const form = useForm<ComprehensiveProfile>({
-    // Temporarily disable strict validation to fix runtime errors
-    // resolver: zodResolver(comprehensiveProfileSchema),
+    resolver: zodResolver(comprehensiveProfileSchema),
     defaultValues: {
       firstName: '',
       lastName: '',
@@ -96,66 +95,25 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       state: '',
       zipCode: '',
       country: 'United States',
-      linkedinProfile: '',
-      website: '',
-      portfolioUrl: '',
       workAuthorization: 'us_citizen',
       requiresSponsorship: false,
-      visaStatus: '',
-      desiredSalary: '',
-      salaryMin: '',
-      salaryMax: '',
-      salaryNegotiable: true,
-      availableStartDate: '',
-      noticePeriod: '',
-      highestDegree: 'bachelors',
-      university: '',
-      major: '',
-      graduationYear: '',
-      gpa: '',
-      yearsOfExperience: '',
-      currentTitle: '',
-      currentCompany: '',
-      previousTitle: '',
-      previousCompany: '',
-      skills: [],
-      certifications: [],
-      languages: [],
-      criminalBackground: false,
-      drugTest: false,
-      backgroundCheckConsent: true,
-      race: 'prefer_not_to_say',
-      gender: 'prefer_not_to_say',
-      veteranStatus: 'not_veteran',
-      disabilityStatus: 'no',
-      jobType: 'full_time',
-      workLocation: 'remote',
-      willingToRelocate: false,
-      willingToTravel: false,
-      hasReferences: false,
-      referenceContactInfo: '',
-      whyInterested: '',
-      strengthsWeaknesses: '',
-      careerGoals: '',
-      additionalInfo: '',
-      customResponses: {},
-      whatsappNumber: '',
+      enableAICoverLetter: true,
       enableWhatsappNotifications: false,
       enableEmailNotifications: true,
-      enableAICoverLetter: true,
-      coverLetterTemplate: '',
       preferredLoginMethod: 'manual',
       loginEmail: '',
       loginPassword: '',
+      whatsappNumber: '',
       resumeFileName: '',
-      coverLetterFileName: ''
+      coverLetterFileName: '',
+      customResponses: {}
     },
     mode: 'onChange'
   });
 
   // Auto-save profile on key field changes (without showing notifications)
   const autoSaveProfile = useMutation({
-    mutationFn: async (profileData: Partial<ComprehensiveProfile>) => {
+    mutationFn: async (profileData: ComprehensiveProfile) => {
       const response = await fetch('/api/profile/save', {
         method: 'POST',
         headers: {
@@ -165,9 +123,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        console.warn('Auto-save failed:', errorData);
-        return; // Silently fail for auto-save
+        throw new Error('Failed to save profile');
       }
       
       return response.json();
@@ -236,7 +192,6 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
     },
     onSuccess: (result) => {
       setAnalysisResult(result);
-      setIsAnalyzingResume(false);
       // Auto-fill form with extracted data
       if (result.extractedProfile) {
         Object.entries(result.extractedProfile).forEach(([key, value]) => {
@@ -251,7 +206,6 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       });
     },
     onError: (error) => {
-      setIsAnalyzingResume(false);
       toast({
         title: "Analysis Failed",
         description: (error as Error).message,
@@ -277,13 +231,11 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
 
   // Auto-load profile when email is entered
   useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === 'email' && value.email && value.email.includes('@') && value.email !== savedProfileEmail) {
-        setSavedProfileEmail(value.email);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [savedProfileEmail]);
+    const emailValue = form.watch('email');
+    if (emailValue && emailValue.includes('@') && emailValue !== savedProfileEmail) {
+      setSavedProfileEmail(emailValue);
+    }
+  }, [form.watch('email')]);
 
   // Load saved profile data into form
   useEffect(() => {
@@ -301,20 +253,20 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
     }
   }, [savedProfile, profileLoaded]);
 
-  // Auto-save on important field changes (silent) - temporarily disabled
-  // useEffect(() => {
-  //   const subscription = form.watch((value, { name }) => {
-  //     const importantFields = ['email', 'firstName', 'lastName', 'phone', 'address', 'city', 'state'];
-  //     if (name && importantFields.includes(name) && value.email && value.firstName && value.lastName) {
-  //       // Debounce auto-save
-  //       const timer = setTimeout(() => {
-  //         autoSaveProfile.mutate(value as Partial<ComprehensiveProfile>);
-  //       }, 2000);
-  //       return () => clearTimeout(timer);
-  //     }
-  //   });
-  //   return () => subscription.unsubscribe();
-  // }, [form.watch]);
+  // Auto-save on important field changes (silent)
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      const importantFields = ['email', 'firstName', 'lastName', 'phone', 'address', 'city', 'state'];
+      if (name && importantFields.includes(name) && value.email && value.firstName && value.lastName) {
+        // Debounce auto-save
+        const timer = setTimeout(() => {
+          autoSaveProfile.mutate(value as ComprehensiveProfile);
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form.watch]);
 
   const handleResumeUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -325,7 +277,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       // Automatically analyze resume
       setIsAnalyzingResume(true);
       analyzeResumeMutation.mutate(file);
-      // Note: setIsAnalyzingResume(false) is handled in mutation callbacks
+      setIsAnalyzingResume(false);
     }
   };
 
@@ -390,14 +342,9 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       return;
     }
 
-    // Save profile before submission (non-blocking)
-    try {
-      if (!showProfileSaveSuccess) {
-        await saveProfileMutation.mutateAsync(data);
-      }
-    } catch (error) {
-      console.warn('Profile save failed, continuing with application:', error);
-      // Continue with application even if profile save fails
+    // Show profile save success only on final submission
+    if (!showProfileSaveSuccess) {
+      await saveProfileMutation.mutateAsync(data);
     }
 
     const formData = new FormData();
@@ -429,7 +376,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit((data) => onSubmit(data as ComprehensiveProfile))} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <Tabs defaultValue="basic" className="w-full">
                 <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="basic">Basic Info</TabsTrigger>
