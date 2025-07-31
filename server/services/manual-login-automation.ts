@@ -152,14 +152,18 @@ export class ManualLoginAutomationService {
       if (requiresLogin) {
         console.log('🔐 Login detected - sending email for manual login');
         
-        // Send email notification for manual login
+        // Send email notification for manual login with fresh job URL
         try {
+          // Get fresh session data to ensure correct job URL
+          const freshSession = await storage.getApplicationSession(sessionId);
+          const currentJobUrl = freshSession?.jobUrl || request.jobUrl;
+          
           await this.emailService.sendManualLoginEmail({
             userEmail: request.profile.email,
             userName: request.profile.name,
             jobTitle: jobDetails.title,
             company: jobDetails.company,
-            jobUrl: request.jobUrl,
+            jobUrl: currentJobUrl, // Use fresh URL from database
             sessionId: sessionId
           });
           
@@ -357,20 +361,16 @@ export class ManualLoginAutomationService {
     const approvalUrl = `${process.env.REPLIT_DOMAINS || 'http://localhost:5000'}/api/approve-submission/${sessionId}`;
     const rejectUrl = `${process.env.REPLIT_DOMAINS || 'http://localhost:5000'}/api/reject-submission/${sessionId}`;
 
-    // Send email notification
+    // Send email notification - only after form is filled and ready for submission
     try {
-      // Get fresh session data from database to ensure correct job URL
-      const dbSession = await storage.getApplicationSession(sessionId);
-      if (dbSession) {
-        await this.emailService.sendJobApplicationReview(
-          profile.email,
-          session.jobDetails.title,
-          session.jobDetails.company,
-          approvalUrl,
-          rejectUrl
-        );
-        console.log('📧 Review email sent with fresh job URL');
-      }
+      await this.emailService.sendJobApplicationReview(
+        profile.email,
+        session.jobDetails.title,
+        session.jobDetails.company,
+        approvalUrl,
+        rejectUrl
+      );
+      console.log('📧 Review email sent');
     } catch (error) {
       console.log('Email send failed:', error);
     }
