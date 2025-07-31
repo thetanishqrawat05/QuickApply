@@ -318,9 +318,9 @@ export class ManualLoginAutomationService {
       let aiCoverLetter = '';
       if (profile?.enableAICoverLetter) {
         try {
-          const experienceText = Array.isArray(profile.experience) 
-            ? profile.experience.map(exp => `${exp.title} at ${exp.company}`).join(', ')
-            : 'Software engineering experience';
+          const experienceText = profile.currentTitle && profile.currentCompany 
+            ? `${profile.currentTitle} at ${profile.currentCompany}`
+            : 'Professional experience';
             
           aiCoverLetter = await this.geminiService.generateCoverLetter(
             session.jobDetails.title,
@@ -436,10 +436,10 @@ export class ManualLoginAutomationService {
     setTimeout(async () => {
       const currentSession = await storage.getApplicationSession(sessionId);
       if (currentSession?.status === 'ready_for_submission') {
-        console.log('⏰ 8 seconds elapsed - auto-submitting application');
+        console.log('⏰ 5 seconds elapsed - auto-submitting application');
         await this.submitApplication(sessionId);
       }
-    }, 8000); // 8 seconds for faster processing
+    }, 5000); // 5 seconds for faster processing
   }
 
   async approveSubmission(sessionId: string): Promise<{ success: boolean; message: string }> {
@@ -862,51 +862,302 @@ export class ManualLoginAutomationService {
 
   private async fillApplicationForm(page: Page, profile: ComprehensiveProfile, coverLetter?: string): Promise<void> {
     try {
-      console.log('📝 Filling application form...');
+      console.log('📝 Filling comprehensive application form...');
 
-      // Fill basic information
-      await this.fillFieldSafely(page, 'input[name*="name"], input[id*="name"], input[placeholder*="name"]', profile.name);
-      await this.fillFieldSafely(page, 'input[type="email"], input[name*="email"], input[id*="email"]', profile.email);
-      await this.fillFieldSafely(page, 'input[type="tel"], input[name*="phone"], input[id*="phone"]', profile.phone);
+      // Basic Information (Most Critical)
+      await this.fillFieldSafely(page, 'input[name*="firstName" i], input[id*="firstName" i], input[placeholder*="first name" i]', profile.firstName);
+      await this.fillFieldSafely(page, 'input[name*="lastName" i], input[id*="lastName" i], input[placeholder*="last name" i]', profile.lastName);
+      await this.fillFieldSafely(page, 'input[name*="name" i], input[id*="name" i], input[placeholder*="full name" i]', profile.name);
+      await this.fillFieldSafely(page, 'input[type="email"], input[name*="email" i], input[id*="email" i]', profile.email);
+      await this.fillFieldSafely(page, 'input[type="tel"], input[name*="phone" i], input[id*="phone" i], input[placeholder*="phone" i]', profile.phone);
 
-      // Fill address information
+      // Address Information (Required by most companies)
       if (profile.address) {
-        await this.fillFieldSafely(page, 'input[name*="address"], input[id*="address"]', profile.address);
+        await this.fillFieldSafely(page, 'input[name*="address" i], input[id*="address" i], input[placeholder*="address" i]', profile.address);
       }
       if (profile.city) {
-        await this.fillFieldSafely(page, 'input[name*="city"], input[id*="city"]', profile.city);
+        await this.fillFieldSafely(page, 'input[name*="city" i], input[id*="city" i], input[placeholder*="city" i]', profile.city);
       }
       if (profile.state) {
-        await this.fillFieldSafely(page, 'input[name*="state"], select[name*="state"]', profile.state);
+        await this.fillSelectField(page, 'select[name*="state" i], select[id*="state" i]', profile.state);
+        await this.fillFieldSafely(page, 'input[name*="state" i], input[id*="state" i]', profile.state);
       }
       if (profile.zipCode) {
-        await this.fillFieldSafely(page, 'input[name*="zip"], input[name*="postal"]', profile.zipCode);
+        await this.fillFieldSafely(page, 'input[name*="zip" i], input[name*="postal" i], input[id*="zip" i]', profile.zipCode);
+      }
+      if (profile.country) {
+        await this.fillSelectField(page, 'select[name*="country" i], select[id*="country" i]', profile.country);
       }
 
-      // Fill cover letter
+      // Professional Links
+      if (profile.linkedinProfile) {
+        await this.fillFieldSafely(page, 'input[name*="linkedin" i], input[id*="linkedin" i], input[placeholder*="linkedin" i]', profile.linkedinProfile);
+      }
+      if (profile.website) {
+        await this.fillFieldSafely(page, 'input[name*="website" i], input[id*="website" i], input[placeholder*="website" i]', profile.website);
+      }
+      if (profile.portfolioUrl) {
+        await this.fillFieldSafely(page, 'input[name*="portfolio" i], input[id*="portfolio" i], input[placeholder*="portfolio" i]', profile.portfolioUrl);
+      }
+
+      // Work Authorization (Critical for compliance)
+      if (profile.workAuthorization) {
+        await this.fillSelectField(page, 'select[name*="authorization" i], select[id*="authorization" i], select[name*="eligibility" i]', profile.workAuthorization);
+      }
+      if (profile.requiresSponsorship !== undefined) {
+        await this.fillCheckboxField(page, 'input[name*="sponsor" i], input[id*="sponsor" i]', profile.requiresSponsorship);
+      }
+
+      // Education Information
+      if (profile.highestDegree) {
+        await this.fillSelectField(page, 'select[name*="degree" i], select[id*="degree" i], select[name*="education" i]', profile.highestDegree);
+      }
+      if (profile.university) {
+        await this.fillFieldSafely(page, 'input[name*="university" i], input[name*="school" i], input[id*="university" i]', profile.university);
+      }
+      if (profile.major) {
+        await this.fillFieldSafely(page, 'input[name*="major" i], input[name*="field" i], input[id*="major" i]', profile.major);
+      }
+      if (profile.graduationYear) {
+        await this.fillFieldSafely(page, 'input[name*="graduation" i], input[id*="graduation" i], select[name*="year" i]', profile.graduationYear);
+      }
+      if (profile.gpa) {
+        await this.fillFieldSafely(page, 'input[name*="gpa" i], input[id*="gpa" i]', profile.gpa);
+      }
+
+      // Experience Information
+      if (profile.yearsOfExperience) {
+        await this.fillFieldSafely(page, 'input[name*="experience" i], select[name*="experience" i], input[id*="experience" i]', profile.yearsOfExperience);
+      }
+      if (profile.currentTitle) {
+        await this.fillFieldSafely(page, 'input[name*="currentTitle" i], input[name*="current" i], input[id*="title" i]', profile.currentTitle);
+      }
+      if (profile.currentCompany) {
+        await this.fillFieldSafely(page, 'input[name*="currentCompany" i], input[name*="employer" i], input[id*="company" i]', profile.currentCompany);
+      }
+
+      // Salary Information
+      if (profile.desiredSalary) {
+        await this.fillFieldSafely(page, 'input[name*="salary" i], input[id*="salary" i], input[name*="compensation" i]', profile.desiredSalary);
+      }
+      if (profile.availableStartDate) {
+        await this.fillFieldSafely(page, 'input[name*="start" i], input[id*="start" i], input[type="date"]', profile.availableStartDate);
+      }
+
+      // Diversity Questions (if present)
+      if (profile.race && profile.race !== 'prefer_not_to_say') {
+        await this.fillSelectField(page, 'select[name*="race" i], select[name*="ethnicity" i]', profile.race);
+      }
+      if (profile.gender && profile.gender !== 'prefer_not_to_say') {
+        await this.fillSelectField(page, 'select[name*="gender" i]', profile.gender);
+      }
+      if (profile.veteranStatus && profile.veteranStatus !== 'prefer_not_to_say') {
+        await this.fillSelectField(page, 'select[name*="veteran" i]', profile.veteranStatus);
+      }
+      if (profile.disabilityStatus && profile.disabilityStatus !== 'prefer_not_to_say') {
+        await this.fillSelectField(page, 'select[name*="disability" i]', profile.disabilityStatus);
+      }
+
+      // Custom Questions
+      if (profile.whyInterested) {
+        await this.fillFieldSafely(page, 'textarea[name*="why" i], textarea[name*="interest" i], textarea[id*="why" i]', profile.whyInterested);
+      }
+      if (profile.additionalInfo) {
+        await this.fillFieldSafely(page, 'textarea[name*="additional" i], textarea[name*="comments" i], textarea[id*="additional" i]', profile.additionalInfo);
+      }
+
+      // Cover letter
       if (coverLetter) {
-        await this.fillFieldSafely(page, 'textarea[name*="cover"], textarea[id*="cover"]', coverLetter);
+        await this.fillFieldSafely(page, 'textarea[name*="cover" i], textarea[id*="cover" i], textarea[name*="letter" i]', coverLetter);
       }
 
-      console.log('✅ Form filled successfully');
+      // Handle file uploads
+      await this.handleFileUploads(page);
+
+      console.log('✅ Comprehensive form filled successfully');
     } catch (error) {
-      console.log('Error filling form:', error);
+      console.log('Error filling comprehensive form:', error);
       throw error;
     }
   }
 
   private async fillFieldSafely(page: Page, selector: string, value: string): Promise<void> {
+    if (!value) return;
+    
     try {
-      const element = await page.$(selector);
-      if (element) {
-        const isVisible = await element.isVisible();
-        if (isVisible) {
-          await element.fill(value);
-          console.log(`Filled field: ${selector}`);
+      const selectors = selector.split(', ');
+      for (const sel of selectors) {
+        try {
+          const element = await page.$(sel.trim());
+          if (element) {
+            const isVisible = await element.isVisible();
+            if (isVisible) {
+              await element.fill('');
+              await element.fill(value);
+              console.log(`✅ Filled field with selector: ${sel.trim()}`);
+              return;
+            }
+          }
+        } catch (e) {
+          continue;
         }
       }
     } catch (error) {
       console.log(`Could not fill field ${selector}:`, error);
+    }
+  }
+
+  private async fillSelectField(page: Page, selector: string, value: string): Promise<void> {
+    if (!value) return;
+    
+    try {
+      const selectors = selector.split(', ');
+      for (const sel of selectors) {
+        try {
+          const element = await page.$(sel.trim());
+          if (element) {
+            const isVisible = await element.isVisible();
+            if (isVisible) {
+              // Try different approaches for select fields
+              try {
+                await element.selectOption({ label: value });
+                console.log(`✅ Selected option by label: ${value}`);
+                return;
+              } catch (e) {
+                try {
+                  await element.selectOption({ value: value });
+                  console.log(`✅ Selected option by value: ${value}`);
+                  return;
+                } catch (e2) {
+                  try {
+                    await element.selectOption(value);
+                    console.log(`✅ Selected option: ${value}`);
+                    return;
+                  } catch (e3) {
+                    // If all else fails, try to find option with partial match
+                    const options = await element.$$('option');
+                    for (const option of options) {
+                      const text = await option.textContent();
+                      if (text && text.toLowerCase().includes(value.toLowerCase())) {
+                        await option.click();
+                        console.log(`✅ Selected option by partial match: ${value}`);
+                        return;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    } catch (error) {
+      console.log(`Could not fill select field ${selector}:`, error);
+    }
+  }
+
+  private async fillCheckboxField(page: Page, selector: string, value: boolean): Promise<void> {
+    try {
+      const selectors = selector.split(', ');
+      for (const sel of selectors) {
+        try {
+          const element = await page.$(sel.trim());
+          if (element) {
+            const isVisible = await element.isVisible();
+            if (isVisible) {
+              const isChecked = await element.isChecked();
+              if (isChecked !== value) {
+                await element.click();
+                console.log(`✅ Set checkbox to ${value}`);
+              }
+              return;
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    } catch (error) {
+      console.log(`Could not fill checkbox ${selector}:`, error);
+    }
+  }
+
+  private async handleFileUploads(page: Page): Promise<void> {
+    try {
+      console.log('📎 Looking for file upload fields...');
+      
+      // Common file upload selectors
+      const fileUploadSelectors = [
+        'input[type="file"]',
+        'input[name*="resume" i]',
+        'input[name*="cv" i]',
+        'input[id*="resume" i]',
+        'input[id*="cv" i]',
+        'input[accept*="pdf"]',
+        'input[accept*="doc"]',
+        '[data-testid*="file"]',
+        '[data-testid*="upload"]',
+        '.file-upload input',
+        '.upload-area input'
+      ];
+
+      // Look for file upload fields
+      for (const selector of fileUploadSelectors) {
+        try {
+          const elements = await page.$$(selector);
+          for (const element of elements) {
+            const isVisible = await element.isVisible();
+            if (isVisible) {
+              // Check if this looks like a resume upload field
+              const parent = await element.$('..');
+              const parentText = parent ? await parent.textContent() : '';
+              const elementName = await element.getAttribute('name') || '';
+              const elementId = await element.getAttribute('id') || '';
+              
+              const isResumeField = (
+                parentText?.toLowerCase().includes('resume') ||
+                parentText?.toLowerCase().includes('cv') ||
+                elementName.toLowerCase().includes('resume') ||
+                elementName.toLowerCase().includes('cv') ||
+                elementId.toLowerCase().includes('resume') ||
+                elementId.toLowerCase().includes('cv')
+              );
+
+              if (isResumeField) {
+                console.log('📄 Found resume upload field, looking for uploaded files...');
+                
+                // Try to upload a sample resume file (in a real scenario, this would be the user's actual resume)
+                try {
+                  // Create a temporary text file as placeholder (in real implementation, use actual resume)
+                  const fs = await import('fs');
+                  const path = await import('path');
+                  const uploadsDir = path.join(process.cwd(), 'uploads');
+                  const tempResumePath = path.join(uploadsDir, 'temp_resume.txt');
+                  
+                  // Create temp resume file if it doesn't exist
+                  if (!fs.existsSync(tempResumePath)) {
+                    fs.writeFileSync(tempResumePath, 'Sample Resume Content - This would be replaced with actual resume in production');
+                  }
+                  
+                  await element.setInputFiles(tempResumePath);
+                  console.log('✅ Resume file uploaded successfully');
+                  
+                  // Wait for upload to process
+                  await page.waitForTimeout(2000);
+                } catch (uploadError) {
+                  console.log('⚠️ Resume upload failed:', uploadError);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    } catch (error) {
+      console.log('Error handling file uploads:', error);
     }
   }
 

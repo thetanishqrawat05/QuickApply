@@ -13,69 +13,100 @@ export const profileSchema = z.object({
 
 // Enhanced profile for comprehensive job applications
 export const comprehensiveProfileSchema = z.object({
-  // Basic Info
-  name: z.string().min(1, "Name is required"),
+  // Basic Info (Required)
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  name: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email address"), 
   phone: z.string().min(1, "Phone number is required"),
   
-  // Address & Location
-  address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  zipCode: z.string().optional(),
-  country: z.string().optional(),
+  // Address & Location (Required for most applications)
+  address: z.string().min(1, "Address is required"),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(1, "State is required"),
+  zipCode: z.string().min(1, "ZIP code is required"),
+  country: z.string().default("United States"),
   
-  // Work Authorization
-  workAuthorization: z.enum(["citizen", "permanent_resident", "visa_required", "other"]).optional(),
+  // Additional Contact Info
+  linkedinProfile: z.string().optional(),
+  website: z.string().optional(),
+  portfolioUrl: z.string().optional(),
+  
+  // Work Authorization (Critical for many positions)
+  workAuthorization: z.enum(["us_citizen", "permanent_resident", "h1b", "opt", "cpt", "ead", "tn", "other"]).default("us_citizen"),
+  requiresSponsorship: z.boolean().default(false),
   visaStatus: z.string().optional(),
   
   // Salary & Availability
   desiredSalary: z.string().optional(),
-  salaryNegotiable: z.boolean().optional(),
-  startDate: z.string().optional(),
+  salaryMin: z.string().optional(),
+  salaryMax: z.string().optional(),
+  salaryNegotiable: z.boolean().default(true),
+  availableStartDate: z.string().optional(),
+  noticePeriod: z.string().optional(),
   
-  // Education
-  education: z.array(z.object({
-    degree: z.string(),
-    major: z.string(),
-    school: z.string(),
-    graduationYear: z.string(),
-    gpa: z.string().optional(),
-  })).optional(),
+  // Education (Required for most positions)
+  highestDegree: z.enum(["high_school", "associates", "bachelors", "masters", "phd", "other"]).optional(),
+  university: z.string().optional(),
+  major: z.string().optional(),
+  graduationYear: z.string().optional(),
+  gpa: z.string().optional(),
   
-  // Work Experience
-  experience: z.array(z.object({
-    title: z.string(),
-    company: z.string(),
-    startDate: z.string(),
-    endDate: z.string().optional(),
-    current: z.boolean().optional(),
-    description: z.string(),
-  })).optional(),
+  // Professional Experience
+  yearsOfExperience: z.string().optional(),
+  currentTitle: z.string().optional(),
+  currentCompany: z.string().optional(),
+  previousTitle: z.string().optional(),
+  previousCompany: z.string().optional(),
   
-  // Diversity & Inclusion (Optional)
-  ethnicity: z.string().optional(),
-  gender: z.string().optional(),
-  veteranStatus: z.boolean().optional(),
-  disabilityStatus: z.boolean().optional(),
+  // Skills & Certifications
+  skills: z.array(z.string()).optional(),
+  certifications: z.array(z.string()).optional(),
+  languages: z.array(z.string()).optional(),
+  
+  // Background Check & Legal
+  criminalBackground: z.boolean().optional(),
+  drugTest: z.boolean().optional(),
+  backgroundCheckConsent: z.boolean().default(true),
+  
+  // Diversity & Inclusion (Optional but often asked)
+  race: z.enum(["prefer_not_to_say", "white", "black", "hispanic", "asian", "native_american", "pacific_islander", "two_or_more", "other"]).optional(),
+  gender: z.enum(["prefer_not_to_say", "male", "female", "non_binary", "other"]).optional(),
+  veteranStatus: z.enum(["not_veteran", "veteran", "disabled_veteran", "prefer_not_to_say"]).optional(),
+  disabilityStatus: z.enum(["no", "yes", "prefer_not_to_say"]).optional(),
+  
+  // Employment Preferences
+  jobType: z.enum(["full_time", "part_time", "contract", "internship", "temporary"]).optional(),
+  workLocation: z.enum(["remote", "onsite", "hybrid"]).optional(),
+  willingToRelocate: z.boolean().optional(),
+  willingToTravel: z.boolean().optional(),
+  
+  // References
+  hasReferences: z.boolean().optional(),
+  referenceContactInfo: z.string().optional(),
+  
+  // Custom Question Responses (for company-specific questions)
+  whyInterested: z.string().optional(),
+  strengthsWeaknesses: z.string().optional(),
+  careerGoals: z.string().optional(),
+  additionalInfo: z.string().optional(),
+  customResponses: z.record(z.string()).optional(),
   
   // Login credentials for auto-login (encrypted)
   loginEmail: z.string().email().optional(),
   loginPassword: z.string().optional(),
-  preferredLoginMethod: z.enum(["email", "google", "linkedin", "manual"]).optional(),
+  preferredLoginMethod: z.enum(["email", "google", "linkedin", "manual"]).default("manual"),
   
-  // WhatsApp for notifications
+  // Notification preferences
   whatsappNumber: z.string().optional(),
-  enableWhatsappNotifications: z.boolean().optional(),
+  enableWhatsappNotifications: z.boolean().default(false),
+  enableEmailNotifications: z.boolean().default(true),
   
-  // Cover letter preferences
-  enableAICoverLetter: z.boolean().optional(),
+  // AI & Automation preferences
+  enableAICoverLetter: z.boolean().default(true),
   coverLetterTemplate: z.string().optional(),
   
-  // Custom Responses
-  customResponses: z.record(z.string()).optional(),
-  
-  // Files
+  // Files (Required)
   resumeFileName: z.string().optional(),
   coverLetterFileName: z.string().optional(),
 });

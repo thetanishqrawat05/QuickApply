@@ -1,423 +1,745 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, User, MapPin, Briefcase, GraduationCap, DollarSign, FileText } from "lucide-react";
-import { ComprehensiveProfile } from "@shared/schema";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation } from '@tanstack/react-query';
+import { comprehensiveProfileSchema } from '@shared/schema';
+import type { z } from 'zod';
 
-interface Experience {
-  title: string;
-  company: string;
-  startDate: string;
-  endDate?: string;
-  current?: boolean;
-  description: string;
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+
+import { 
+  Brain, 
+  CheckCircle, 
+  Clock, 
+  Globe, 
+  Info,
+  Key,
+  Mail,
+  MessageSquare,
+  Upload,
+  User,
+  MapPin,
+  Phone,
+  Sparkles
+} from 'lucide-react';
+
+type ComprehensiveProfile = z.infer<typeof comprehensiveProfileSchema>;
+
+interface ComprehensiveProfileFormProps {
+  jobUrl: string;
+  onSuccess?: (sessionId: string) => void;
 }
 
-interface Education {
-  degree: string;
-  major: string;
-  school: string;
-  graduationYear: string;
-  gpa?: string;
-}
+export function ComprehensiveProfileForm({ jobUrl, onSuccess }: ComprehensiveProfileFormProps) {
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [coverLetterFile, setCoverLetterFile] = useState<File | null>(null);
+  const { toast } = useToast();
 
-export default function ComprehensiveProfileForm() {
-  const [profile, setProfile] = useLocalStorage<Partial<ComprehensiveProfile>>("comprehensiveProfile", {});
-  const [experience, setExperience] = useState<Experience[]>((profile.experience as Experience[]) || []);
-  const [education, setEducation] = useState<Education[]>((profile.education as Education[]) || []);
+  const form = useForm<ComprehensiveProfile>({
+    resolver: zodResolver(comprehensiveProfileSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      name: '',
+      email: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: 'United States',
+      workAuthorization: 'us_citizen',
+      requiresSponsorship: false,
+      enableAICoverLetter: true,
+      enableWhatsappNotifications: false,
+      enableEmailNotifications: true,
+      preferredLoginMethod: 'manual',
+      loginEmail: '',
+      loginPassword: '',
+      whatsappNumber: '',
+      resumeFileName: '',
+      coverLetterFileName: '',
+      customResponses: {}
+    },
+    mode: 'onChange'
+  });
 
-  const updateProfile = (field: keyof ComprehensiveProfile, value: any) => {
-    setProfile(prev => ({ ...prev, [field]: value }));
+  const applyMutation = useMutation({
+    mutationFn: async (data: { jobUrl: string; profile: ComprehensiveProfile; resumeFile?: File; coverLetterFile?: File }) => {
+      const formData = new FormData();
+      formData.append('jobUrl', data.jobUrl);
+      formData.append('profile', JSON.stringify(data.profile));
+      
+      if (data.resumeFile) {
+        formData.append('resume', data.resumeFile);
+      }
+      if (data.coverLetterFile) {
+        formData.append('coverLetter', data.coverLetterFile);
+      }
+
+      const response = await fetch('/api/real-apply', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({
+          title: "Application Submitted Successfully!",
+          description: data.message || "Your job application has been processed.",
+        });
+        if (data.sessionId && onSuccess) {
+          onSuccess(data.sessionId);
+        }
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Application Failed",
+        description: (error as Error).message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const onSubmit = (data: ComprehensiveProfile) => {
+    if (!resumeFile) {
+      toast({
+        title: "Resume Required",
+        description: "Please upload your resume to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Combine first and last name for full name if not provided
+    if (!data.name && data.firstName && data.lastName) {
+      data.name = `${data.firstName} ${data.lastName}`;
+    }
+
+    applyMutation.mutate({
+      jobUrl,
+      profile: data,
+      resumeFile: resumeFile || undefined,
+      coverLetterFile: coverLetterFile || undefined
+    });
   };
 
-  const addExperience = () => {
-    const newExp: Experience = {
-      title: "",
-      company: "",
-      startDate: "",
-      endDate: "",
-      current: false,
-      description: ""
-    };
-    const updated = [...experience, newExp];
-    setExperience(updated);
-    updateProfile('experience', updated);
+  const handleResumeUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setResumeFile(file);
+      form.setValue('resumeFileName', file.name);
+    }
   };
 
-  const updateExperience = (index: number, field: keyof Experience, value: any) => {
-    const updated = experience.map((exp, i) => 
-      i === index ? { ...exp, [field]: value } : exp
-    );
-    setExperience(updated);
-    updateProfile('experience', updated);
-  };
-
-  const removeExperience = (index: number) => {
-    const updated = experience.filter((_, i) => i !== index);
-    setExperience(updated);
-    updateProfile('experience', updated);
-  };
-
-  const addEducation = () => {
-    const newEdu: Education = {
-      degree: "",
-      major: "",
-      school: "",
-      graduationYear: "",
-      gpa: ""
-    };
-    const updated = [...education, newEdu];
-    setEducation(updated);
-    updateProfile('education', updated);
-  };
-
-  const updateEducation = (index: number, field: keyof Education, value: any) => {
-    const updated = education.map((edu, i) => 
-      i === index ? { ...edu, [field]: value } : edu
-    );
-    setEducation(updated);
-    updateProfile('education', updated);
-  };
-
-  const removeEducation = (index: number) => {
-    const updated = education.filter((_, i) => i !== index);
-    setEducation(updated);
-    updateProfile('education', updated);
+  const handleCoverLetterUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setCoverLetterFile(file);
+      form.setValue('coverLetterFileName', file.name);
+    }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Basic Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Basic Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="name">Full Name *</Label>
-              <Input
-                id="name"
-                value={profile.name || ""}
-                onChange={(e) => updateProfile('name', e.target.value)}
-                placeholder="John Doe"
-              />
-            </div>
-            <div>
-              <Label htmlFor="email">Email Address *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={profile.email || ""}
-                onChange={(e) => updateProfile('email', e.target.value)}
-                placeholder="john@example.com"
-              />
-            </div>
-            <div>
-              <Label htmlFor="phone">Phone Number *</Label>
-              <Input
-                id="phone"
-                value={profile.phone || ""}
-                onChange={(e) => updateProfile('phone', e.target.value)}
-                placeholder="(555) 123-4567"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="max-w-4xl mx-auto p-6 space-y-8">
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          Complete Your Profile
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Fill out all fields to ensure successful job applications across all platforms
+        </p>
+      </div>
 
-      {/* Address & Location */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5" />
-            Address & Location
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="address">Street Address</Label>
-            <Input
-              id="address"
-              value={profile.address || ""}
-              onChange={(e) => updateProfile('address', e.target.value)}
-              placeholder="123 Main Street"
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                value={profile.city || ""}
-                onChange={(e) => updateProfile('city', e.target.value)}
-                placeholder="New York"
-              />
-            </div>
-            <div>
-              <Label htmlFor="state">State</Label>
-              <Input
-                id="state"
-                value={profile.state || ""}
-                onChange={(e) => updateProfile('state', e.target.value)}
-                placeholder="NY"
-              />
-            </div>
-            <div>
-              <Label htmlFor="zipCode">ZIP Code</Label>
-              <Input
-                id="zipCode"
-                value={profile.zipCode || ""}
-                onChange={(e) => updateProfile('zipCode', e.target.value)}
-                placeholder="10001"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <Tabs defaultValue="basic" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="professional">Professional</TabsTrigger>
+              <TabsTrigger value="education">Education</TabsTrigger>
+              <TabsTrigger value="preferences">Preferences</TabsTrigger>
+              <TabsTrigger value="files">Files</TabsTrigger>
+            </TabsList>
 
-      {/* Work Authorization */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Work Authorization
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="workAuth">Work Authorization Status</Label>
-            <Select 
-              value={profile.workAuthorization || ""} 
-              onValueChange={(value) => updateProfile('workAuthorization', value)}
+            {/* Basic Information Tab */}
+            <TabsContent value="basic" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Personal Information
+                  </CardTitle>
+                  <CardDescription>
+                    Basic contact information (required for all applications)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email *</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="john@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone *</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="+1 (555) 123-4567" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Address *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="123 Main Street" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>City *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="New York" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="state"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>State *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="NY" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="zipCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ZIP Code *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="10001" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="linkedinProfile"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>LinkedIn Profile</FormLabel>
+                        <FormControl>
+                          <Input placeholder="linkedin.com/in/your-profile" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Professional Information Tab */}
+            <TabsContent value="professional" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Work Authorization</CardTitle>
+                  <CardDescription>
+                    Employment eligibility (required by most employers)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="workAuthorization"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Work Authorization Status *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select work authorization" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="us_citizen">US Citizen</SelectItem>
+                            <SelectItem value="permanent_resident">Permanent Resident</SelectItem>
+                            <SelectItem value="h1b">H1B Visa</SelectItem>
+                            <SelectItem value="opt">OPT</SelectItem>
+                            <SelectItem value="cpt">CPT</SelectItem>
+                            <SelectItem value="ead">EAD</SelectItem>
+                            <SelectItem value="tn">TN Visa</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="requiresSponsorship"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            I require visa sponsorship
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Experience & Salary</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="yearsOfExperience"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Years of Experience</FormLabel>
+                        <FormControl>
+                          <Input placeholder="5" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="currentTitle"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Current Job Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Software Engineer" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="currentCompany"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Current Company</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Tech Corp" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="desiredSalary"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Desired Salary</FormLabel>
+                        <FormControl>
+                          <Input placeholder="$120,000" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Education Tab */}
+            <TabsContent value="education" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Education Background</CardTitle>
+                  <CardDescription>
+                    Education information (required by most employers)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="highestDegree"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Highest Degree</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select degree" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="high_school">High School</SelectItem>
+                            <SelectItem value="associates">Associate's</SelectItem>
+                            <SelectItem value="bachelors">Bachelor's</SelectItem>
+                            <SelectItem value="masters">Master's</SelectItem>
+                            <SelectItem value="phd">PhD</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="university"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>University/School</FormLabel>
+                        <FormControl>
+                          <Input placeholder="University of California" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="major"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Major/Field of Study</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Computer Science" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="graduationYear"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Graduation Year</FormLabel>
+                        <FormControl>
+                          <Input placeholder="2020" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="gpa"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>GPA (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="3.8" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Preferences Tab */}
+            <TabsContent value="preferences" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5" />
+                    AI & Automation Settings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="enableAICoverLetter"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Generate AI cover letters
+                          </FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            Automatically create tailored cover letters for each application
+                          </p>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="enableWhatsappNotifications"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            WhatsApp notifications
+                          </FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            Get instant notifications on WhatsApp
+                          </p>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  {form.watch('enableWhatsappNotifications') && (
+                    <FormField
+                      control={form.control}
+                      name="whatsappNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>WhatsApp Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="+1234567890" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Custom Responses</CardTitle>
+                  <CardDescription>
+                    Common answers for application questions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="whyInterested"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Why are you interested in this role?</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="I am passionate about..." 
+                            className="min-h-[100px]"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="additionalInfo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Additional Information</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Any additional information you'd like to share..." 
+                            className="min-h-[80px]"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Files Tab */}
+            <TabsContent value="files" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Upload className="h-5 w-5" />
+                    Required Documents
+                  </CardTitle>
+                  <CardDescription>
+                    Upload your resume and cover letter (resume is required)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="resume-upload">Resume (Required) *</Label>
+                    <Input
+                      id="resume-upload"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleResumeUpload}
+                      className="cursor-pointer"
+                    />
+                    {resumeFile && (
+                      <p className="text-sm text-green-600 flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        {resumeFile.name} uploaded successfully
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cover-letter-upload">Cover Letter (Optional)</Label>
+                    <Input
+                      id="cover-letter-upload"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleCoverLetterUpload}
+                      className="cursor-pointer"
+                    />
+                    {coverLetterFile && (
+                      <p className="text-sm text-green-600 flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        {coverLetterFile.name} uploaded successfully
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          <Separator />
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+            <div className="text-sm text-muted-foreground">
+              <Clock className="inline h-4 w-4 mr-1" />
+              Applications process in ~5 seconds
+            </div>
+            
+            <Button 
+              type="submit" 
+              disabled={applyMutation.isPending || !resumeFile}
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select work authorization status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="citizen">US Citizen</SelectItem>
-                <SelectItem value="permanent_resident">Permanent Resident</SelectItem>
-                <SelectItem value="visa_required">Visa Required</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
+              {applyMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Processing Application...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Start Auto-Apply Process
+                </>
+              )}
+            </Button>
           </div>
-          {profile.workAuthorization === 'visa_required' && (
-            <div>
-              <Label htmlFor="visaStatus">Visa Status Details</Label>
-              <Input
-                id="visaStatus"
-                value={profile.visaStatus || ""}
-                onChange={(e) => updateProfile('visaStatus', e.target.value)}
-                placeholder="H1-B, F1-OPT, etc."
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Salary & Availability */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="w-5 h-5" />
-            Salary & Availability
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="salary">Desired Salary</Label>
-              <Input
-                id="salary"
-                value={profile.desiredSalary || ""}
-                onChange={(e) => updateProfile('desiredSalary', e.target.value)}
-                placeholder="$80,000 - $100,000"
-              />
-            </div>
-            <div>
-              <Label htmlFor="startDate">Available Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={profile.startDate || ""}
-                onChange={(e) => updateProfile('startDate', e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="negotiable"
-              checked={profile.salaryNegotiable || false}
-              onCheckedChange={(checked) => updateProfile('salaryNegotiable', checked)}
-            />
-            <Label htmlFor="negotiable">Salary is negotiable</Label>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Work Experience */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Briefcase className="w-5 h-5" />
-            Work Experience
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {experience.map((exp, index) => (
-            <div key={index} className="border p-4 rounded-lg space-y-4">
-              <div className="flex justify-between items-center">
-                <h4 className="font-semibold">Experience #{index + 1}</h4>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeExperience(index)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Job Title</Label>
-                  <Input
-                    value={exp.title}
-                    onChange={(e) => updateExperience(index, 'title', e.target.value)}
-                    placeholder="Software Engineer"
-                  />
-                </div>
-                <div>
-                  <Label>Company</Label>
-                  <Input
-                    value={exp.company}
-                    onChange={(e) => updateExperience(index, 'company', e.target.value)}
-                    placeholder="Tech Corp"
-                  />
-                </div>
-                <div>
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={exp.startDate}
-                    onChange={(e) => updateExperience(index, 'startDate', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>End Date</Label>
-                  <Input
-                    type="date"
-                    value={exp.endDate}
-                    onChange={(e) => updateExperience(index, 'endDate', e.target.value)}
-                    disabled={exp.current}
-                  />
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id={`current-${index}`}
-                  checked={exp.current}
-                  onCheckedChange={(checked) => updateExperience(index, 'current', checked)}
-                />
-                <Label htmlFor={`current-${index}`}>Currently work here</Label>
-              </div>
-              <div>
-                <Label>Job Description</Label>
-                <Textarea
-                  value={exp.description}
-                  onChange={(e) => updateExperience(index, 'description', e.target.value)}
-                  placeholder="Describe your responsibilities and achievements..."
-                  rows={3}
-                />
-              </div>
-            </div>
-          ))}
-          <Button onClick={addExperience} variant="outline" className="w-full">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Work Experience
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Education */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <GraduationCap className="w-5 h-5" />
-            Education
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {education.map((edu, index) => (
-            <div key={index} className="border p-4 rounded-lg space-y-4">
-              <div className="flex justify-between items-center">
-                <h4 className="font-semibold">Education #{index + 1}</h4>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeEducation(index)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Degree</Label>
-                  <Input
-                    value={edu.degree}
-                    onChange={(e) => updateEducation(index, 'degree', e.target.value)}
-                    placeholder="Bachelor of Science"
-                  />
-                </div>
-                <div>
-                  <Label>Major/Field of Study</Label>
-                  <Input
-                    value={edu.major}
-                    onChange={(e) => updateEducation(index, 'major', e.target.value)}
-                    placeholder="Computer Science"
-                  />
-                </div>
-                <div>
-                  <Label>School/University</Label>
-                  <Input
-                    value={edu.school}
-                    onChange={(e) => updateEducation(index, 'school', e.target.value)}
-                    placeholder="University Name"
-                  />
-                </div>
-                <div>
-                  <Label>Graduation Year</Label>
-                  <Input
-                    value={edu.graduationYear}
-                    onChange={(e) => updateEducation(index, 'graduationYear', e.target.value)}
-                    placeholder="2023"
-                  />
-                </div>
-                <div>
-                  <Label>GPA (Optional)</Label>
-                  <Input
-                    value={edu.gpa}
-                    onChange={(e) => updateEducation(index, 'gpa', e.target.value)}
-                    placeholder="3.8"
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-          <Button onClick={addEducation} variant="outline" className="w-full">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Education
-          </Button>
-        </CardContent>
-      </Card>
+        </form>
+      </Form>
     </div>
   );
 }

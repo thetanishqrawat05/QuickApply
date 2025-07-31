@@ -49,6 +49,8 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
   const form = useForm<ComprehensiveProfile>({
     resolver: zodResolver(comprehensiveProfileSchema),
     defaultValues: {
+      firstName: '',
+      lastName: '',
       name: '',
       email: '',
       phone: '',
@@ -56,16 +58,18 @@ export function EnhancedAutoApplyForm({ jobUrl, onSuccess }: EnhancedAutoApplyFo
       city: '',
       state: '',
       zipCode: '',
-      workAuthorization: 'citizen',
+      country: 'United States',
+      workAuthorization: 'us_citizen',
+      requiresSponsorship: false,
       enableAICoverLetter: true,
       enableWhatsappNotifications: false,
-      preferredLoginMethod: 'email',
+      enableEmailNotifications: true,
+      preferredLoginMethod: 'manual',
       loginEmail: '',
       loginPassword: '',
       whatsappNumber: '',
       resumeFileName: '',
       coverLetterFileName: '',
-      experience: [],
       customResponses: {}
     },
     mode: 'onChange'
