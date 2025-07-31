@@ -1,0 +1,3 @@
+Error: Failed to capture form preview: page.screenshot: options.quality is unsupported for the png screenshots
+Timestamp: 2025-07-31T05:42:25.640Z
+URL: https://apply.ukg.com/careers/job/893383715162
