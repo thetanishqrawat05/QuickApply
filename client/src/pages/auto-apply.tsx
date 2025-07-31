@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { EnhancedProfileForm } from '@/components/enhanced-profile-form';
+import InteractiveApplicationForm from '@/components/interactive-application-form';
 import { ApplicationLogsDashboard } from '@/components/application-logs-dashboard';
 import { Logo } from '@/components/ui/logo';
 import { Button } from '@/components/ui/button';
@@ -160,7 +160,7 @@ export default function AutoApplyPage() {
                   {/* Dynamic Form Section */}
                   {jobUrl && (
                     <div className="mt-8 fade-in-up stagger-2">
-                      <EnhancedProfileForm 
+                      <InteractiveApplicationForm 
                         jobUrl={jobUrl} 
                         onSuccess={handleApplicationSuccess}
                       />

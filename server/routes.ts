@@ -13,6 +13,7 @@ import { ManualLoginAutomationService } from "./services/manual-login-automation
 import { SecureLoginLinkService } from "./services/secure-login-link-service";
 import { ResumeAnalyzerService } from "./services/resume-analyzer";
 import { storage } from "./storage";
+import interactiveApplyRoutes from "./routes/interactive-apply";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -204,7 +205,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(existingUser);
       }
 
-      const user = await storage.createUser(validationResult.data);
+      const user = await storage.createUser({
+        name: validationResult.data.name,
+        email: validationResult.data.email,
+        phone: validationResult.data.phone,
+        resumeFileName: validationResult.data.resumeFileName || null,
+        coverLetterFileName: validationResult.data.coverLetterFileName || null
+      });
       res.json(user);
     } catch (error) {
       console.error("Create user error:", error);
@@ -614,6 +621,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // Use interactive apply routes
+  app.use('/api/interactive-apply', interactiveApplyRoutes);
 
   // Health check
   app.get("/api/health", (req, res) => {

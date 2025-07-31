@@ -29,7 +29,7 @@ export default function EnhancedApplicationForm({ jobUrl, onSuccess, onError }: 
   const totalSteps = 6;
   const progress = (step / totalSteps) * 100;
 
-  const updateProfile = (field: keyof ComprehensiveProfile, value: any) => {
+  const updateProfile = (field: keyof ComprehensiveProfile, value: string | boolean | string[] | Record<string, string>) => {
     setProfile(prev => ({ ...prev, [field]: value }));
   };
 
