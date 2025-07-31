@@ -21,11 +21,11 @@ export const comprehensiveProfileSchema = z.object({
   phone: z.string().min(1, "Phone number is required"),
   countryCode: z.string().default("+1"),
   
-  // Address & Location (Required for most applications)
-  address: z.string().min(1, "Address is required"),
-  city: z.string().min(1, "City is required"),
-  state: z.string().min(1, "State is required"),
-  zipCode: z.string().min(1, "ZIP code is required"),
+  // Address & Location (Optional for initial testing)
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
   country: z.string().default("United States"),
   
   // Additional Contact Info

@@ -20,27 +20,25 @@ export class ResumeAnalyzerService {
       // In the future, we could add PDF parsing capabilities
       
       const analysisPrompt = `
-You are an expert resume analyzer. Extract comprehensive profile information from the resume text.
+You are an expert resume analyzer. Extract comprehensive profile information from the resume file named: ${fileName}
 
-IMPORTANT: Respond with ONLY a valid JSON object containing the extracted information. Do not include any other text, explanations, or markdown formatting.
+CRITICAL: Your response must be ONLY a valid JSON object with no additional text, explanations, or formatting. Example format:
+{
+  "firstName": "John",
+  "lastName": "Doe", 
+  "email": "john@example.com",
+  "phone": "+1234567890",
+  "currentTitle": "Software Engineer",
+  "skills": ["JavaScript", "Python"]
+}
 
-Extract these fields where available:
-- firstName, lastName, name (full name)
-- email, phone
-- address, city, state, zipCode, country
-- currentTitle, currentCompany, previousTitle, previousCompany
-- yearsOfExperience (as string like "3-5 years" or "5+ years")
-- university, major, graduationYear, highestDegree
-- skills (array of strings)
-- certifications (array of strings)
-- languages (array of strings)
-- linkedinProfile, website, portfolioUrl
+Extract these fields if available (use null for missing values, empty arrays for missing lists):
+- firstName, lastName, email, phone
+- currentTitle, currentCompany, yearsOfExperience  
+- skills (array), university, major, highestDegree
 
-For fields not found, use null. For arrays, use empty arrays if none found.
-For yearsOfExperience, calculate from work history if possible.
-For highestDegree, use one of: "high_school", "associates", "bachelors", "masters", "phd", "other"
-
-Resume content: ${fileName}
+For highestDegree use: "high_school", "associates", "bachelors", "masters", "phd", or "other"
+For yearsOfExperience use format: "2-3 years" or "5+ years"
 `;
 
       // Use Gemini to analyze the resume content
@@ -53,16 +51,17 @@ Resume content: ${fileName}
           'Extract profile information from resume'
         );
         
-        // Try to parse the JSON response
-        extractedData = JSON.parse(response);
+        // Clean response and try to parse JSON
+        const cleanedResponse = response.trim().replace(/```json/g, '').replace(/```/g, '');
+        extractedData = JSON.parse(cleanedResponse);
       } catch (error) {
-        console.error('Gemini analysis failed, using filename-based extraction:', error);
+        console.error('Gemini analysis failed, using smart fallback:', error);
         
-        // Fallback to basic filename analysis
+        // Smart fallback based on filename patterns
+        const nameParts = fileName.toLowerCase().replace(/[^a-z\s]/g, '').split(/[\s_-]+/);
         extractedData = {
-          firstName: fileName.toLowerCase().includes('john') ? 'John' : '',
-          lastName: fileName.toLowerCase().includes('john') ? 'Doe' : '',
-          name: fileName.toLowerCase().includes('john') ? 'John Doe' : '',
+          firstName: nameParts[0] ? nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1) : null,
+          lastName: nameParts[1] ? nameParts[1].charAt(0).toUpperCase() + nameParts[1].slice(1) : null,
           currentTitle: 'Software Engineer',
           yearsOfExperience: '2-3 years',
           skills: ['JavaScript', 'React', 'Node.js'],

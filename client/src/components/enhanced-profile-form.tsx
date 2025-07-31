@@ -191,6 +191,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       return response.json();
     },
     onSuccess: (result) => {
+      setIsAnalyzingResume(false);
       setAnalysisResult(result);
       // Auto-fill form with extracted data
       if (result.extractedProfile) {
@@ -206,6 +207,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       });
     },
     onError: (error) => {
+      setIsAnalyzingResume(false);
       toast({
         title: "Analysis Failed",
         description: (error as Error).message,
@@ -277,7 +279,6 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       // Automatically analyze resume
       setIsAnalyzingResume(true);
       analyzeResumeMutation.mutate(file);
-      setIsAnalyzingResume(false);
     }
   };
 
@@ -342,24 +343,31 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       return;
     }
 
-    // Show profile save success only on final submission
-    if (!showProfileSaveSuccess) {
+    try {
+      // Save profile first
       await saveProfileMutation.mutateAsync(data);
-    }
 
-    const formData = new FormData();
-    formData.append('jobUrl', jobUrl);
-    formData.append('profile', JSON.stringify(data));
-    
-    if (resumeFile) {
-      formData.append('resume', resumeFile);
-    }
-    
-    if (coverLetterFile) {
-      formData.append('coverLetter', coverLetterFile);
-    }
+      const formData = new FormData();
+      formData.append('jobUrl', jobUrl);
+      formData.append('profile', JSON.stringify(data));
+      
+      if (resumeFile) {
+        formData.append('resume', resumeFile);
+      }
+      
+      if (coverLetterFile) {
+        formData.append('coverLetter', coverLetterFile);
+      }
 
-    submitApplicationMutation.mutate(formData);
+      submitApplicationMutation.mutate(formData);
+    } catch (error) {
+      console.error('Profile save failed:', error);
+      toast({
+        title: "Profile Save Failed",
+        description: "Please complete required fields and try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (

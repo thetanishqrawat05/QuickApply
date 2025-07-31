@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
+import { z } from "zod";
 import { applyJobRequestSchema, bulkApplyRequestSchema, insertUserSchema, insertJobApplicationSchema, comprehensiveProfileSchema } from "@shared/schema";
 import { AutomationService } from "./services/automation";
 import { EnhancedAutomationService } from "./services/enhanced-automation";
@@ -107,8 +108,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Profile save endpoint
   app.post("/api/profile/save", async (req, res) => {
     try {
-      const validationResult = comprehensiveProfileSchema.safeParse(req.body);
+      // Use partial validation for auto-save functionality
+      const partialSchema = comprehensiveProfileSchema.partial().extend({
+        email: z.string().email("Invalid email address"),
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required")
+      });
+      
+      const validationResult = partialSchema.safeParse(req.body);
       if (!validationResult.success) {
+        console.log("Validation errors:", validationResult.error.errors);
         return res.status(400).json({ 
           message: "Invalid profile data",
           errors: validationResult.error.errors
@@ -124,7 +133,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user = await storage.updateUser(user.id, profileData);
       } else {
         // Create new user
-        user = await storage.createUser(profileData);
+        user = await storage.createUser({
+          name: `${profileData.firstName} ${profileData.lastName}`,
+          email: profileData.email,
+          phone: profileData.phone || '',
+          countryCode: profileData.countryCode || '+1',
+          firstName: profileData.firstName,
+          lastName: profileData.lastName,
+          ...profileData
+        });
       }
       
       res.json(user);
