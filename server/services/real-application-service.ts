@@ -603,6 +603,9 @@ This will send you an email with a secure login link when login is needed.
       await this.handleWorkAuthorizationDropdown(page, profile.workAuthorization, filledData);
     }
 
+    // Handle common job portal specific fields
+    await this.handleCommonJobPortalFields(page, profile, filledData);
+
     // Wait for any dynamic form updates
     await page.waitForTimeout(1000);
   }
@@ -1758,6 +1761,359 @@ This will send you an email with a secure login link when login is needed.
       } catch (e) {
         console.log(`Failed to fill field with value: ${value}`);
       }
+    }
+  }
+
+  private async handleCommonJobPortalFields(page: Page, profile: ComprehensiveProfile, filledData: Record<string, any>): Promise<void> {
+    console.log('🔍 Handling common job portal specific fields...');
+
+    // Handle start date fields
+    await this.handleStartDateFields(page, profile, filledData);
+    
+    // Handle Yes/No radio buttons for employment history
+    await this.handleEmploymentHistoryQuestions(page, filledData);
+    
+    // Handle checkbox consent forms
+    await this.handleConsentCheckboxes(page, filledData);
+    
+    // Handle company-specific relationship questions
+    await this.handleRelationshipQuestions(page, filledData);
+    
+    // Handle visa/sponsorship questions
+    await this.handleVisaSponsorshipQuestions(page, profile, filledData);
+  }
+
+  private async handleStartDateFields(page: Page, profile: ComprehensiveProfile, filledData: Record<string, any>): Promise<void> {
+    const startDateSelectors = [
+      'input[name*="start" i][name*="date" i]',
+      'input[id*="start" i][id*="date" i]',
+      'input[placeholder*="when can you start" i]',
+      'input[placeholder*="start date" i]',
+      'input[placeholder*="available" i]',
+      'input[type="date"]',
+      'select[name*="start" i]'
+    ];
+
+    const availableDate = profile.availableStartDate || 'Immediately';
+    
+    for (const selector of startDateSelectors) {
+      try {
+        const field = page.locator(selector).first();
+        if (await field.isVisible({ timeout: 1000 })) {
+          const fieldType = await field.getAttribute('type');
+          
+          if (fieldType === 'date') {
+            // For date inputs, use ISO date format
+            const futureDate = new Date();
+            futureDate.setDate(futureDate.getDate() + 14); // 2 weeks from now
+            const isoDate = futureDate.toISOString().split('T')[0];
+            await field.fill(isoDate);
+            console.log(`✅ Set start date: ${isoDate}`);
+          } else {
+            // For text inputs or selects
+            await field.fill(availableDate);
+            console.log(`✅ Set availability: ${availableDate}`);
+          }
+          
+          filledData.startDate = availableDate;
+          break;
+        }
+      } catch (e) {
+        // Continue to next selector
+      }
+    }
+  }
+
+  private async handleEmploymentHistoryQuestions(page: Page, filledData: Record<string, any>): Promise<void> {
+    console.log('🔍 Handling employment history and Yes/No questions...');
+    
+    // Find all radio button groups on the page
+    const allRadioButtons = await page.locator('input[type="radio"]').all();
+    const processedGroups = new Set();
+    
+    for (const radio of allRadioButtons) {
+      try {
+        const name = await radio.getAttribute('name');
+        if (!name || processedGroups.has(name)) continue;
+        
+        processedGroups.add(name);
+        
+        // Get all radios in this group
+        const groupRadios = await page.locator(`input[type="radio"][name="${name}"]`).all();
+        
+        // Find the question text for this group
+        const questionText = await this.findQuestionTextForRadioGroup(page, name);
+        console.log(`Found radio group: "${questionText}"`);
+        
+        // Determine the best answer based on question content
+        const answer = this.determineAnswerForQuestion(questionText);
+        console.log(`Determined answer: ${answer}`);
+        
+        // Select the appropriate radio button
+        for (const groupRadio of groupRadios) {
+          const value = await groupRadio.getAttribute('value') || '';
+          const labelText = await this.getRadioLabelText(page, groupRadio);
+          
+          if (this.doesAnswerMatch(answer, value, labelText)) {
+            if (await groupRadio.isVisible() && await groupRadio.isEnabled()) {
+              await groupRadio.check();
+              console.log(`✅ Selected "${labelText}" for: ${questionText}`);
+              filledData[`question_${name}`] = answer;
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        // Continue to next radio
+      }
+    }
+  }
+
+  private async findQuestionTextForRadioGroup(page: Page, radioName: string): Promise<string> {
+    try {
+      const firstRadio = page.locator(`input[type="radio"][name="${radioName}"]`).first();
+      
+      // Look for question text in various locations relative to the radio group
+      const searchLocators = [
+        firstRadio.locator('..').locator('..').locator('label'),
+        firstRadio.locator('..').locator('..').locator('legend'),
+        firstRadio.locator('..').locator('..').locator('div').first(),
+        firstRadio.locator('..').locator('..').locator('..').locator('label'),
+        page.locator(`label[for*="${radioName}"]`),
+        page.locator(`legend:has(input[name="${radioName}"])`),
+        firstRadio.locator('../../preceding-sibling::*[contains(text(), "?")]')
+      ];
+      
+      for (const locator of searchLocators) {
+        try {
+          const text = await locator.textContent();
+          if (text && text.length > 10 && text.includes('?')) {
+            return text.trim();
+          }
+        } catch (e) {
+          // Continue
+        }
+      }
+      
+      // Fallback: get parent element text
+      const parentText = await firstRadio.locator('..').locator('..').textContent() || '';
+      return parentText.split('\n')[0].trim() || `Radio group: ${radioName}`;
+    } catch (e) {
+      return `Radio group: ${radioName}`;
+    }
+  }
+
+  private async getRadioLabelText(page: Page, radio: any): Promise<string> {
+    try {
+      const id = await radio.getAttribute('id');
+      if (id) {
+        const label = page.locator(`label[for="${id}"]`);
+        const labelText = await label.textContent();
+        if (labelText) return labelText.trim();
+      }
+      
+      // Check for label as parent or sibling
+      const parentLabel = await radio.locator('..').textContent() || '';
+      const siblingLabel = await radio.locator('~ label').textContent() || '';
+      
+      return (siblingLabel || parentLabel).trim();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  private determineAnswerForQuestion(questionText: string): string {
+    const lowerQuestion = questionText.toLowerCase();
+    
+    // Employment history questions - default to No
+    if (lowerQuestion.includes('employed by') || 
+        lowerQuestion.includes('worked for') || 
+        lowerQuestion.includes('previously worked') ||
+        lowerQuestion.includes('personal or familial relationships') ||
+        lowerQuestion.includes('family members') ||
+        lowerQuestion.includes('relatives') ||
+        lowerQuestion.includes('friends or family')) {
+      return 'No';
+    }
+    
+    // Work authorization questions - default to Yes
+    if (lowerQuestion.includes('eligible to work') || 
+        lowerQuestion.includes('authorized to work') || 
+        lowerQuestion.includes('work authorization') ||
+        lowerQuestion.includes('legally authorized') ||
+        lowerQuestion.includes('right to work')) {
+      return 'Yes';
+    }
+    
+    // Sponsorship questions
+    if (lowerQuestion.includes('require sponsorship') || 
+        lowerQuestion.includes('need sponsorship') || 
+        lowerQuestion.includes('visa sponsorship')) {
+      return 'No'; // Most users don't need sponsorship
+    }
+    
+    // Background/legal questions - default to No
+    if (lowerQuestion.includes('criminal') || 
+        lowerQuestion.includes('convicted') || 
+        lowerQuestion.includes('felony') ||
+        lowerQuestion.includes('background')) {
+      return 'No';
+    }
+    
+    // General positive questions - default to Yes
+    if (lowerQuestion.includes('willing') || 
+        lowerQuestion.includes('available') || 
+        lowerQuestion.includes('interested')) {
+      return 'Yes';
+    }
+    
+    // Default to No for safety
+    return 'No';
+  }
+
+  private doesAnswerMatch(targetAnswer: string, value: string, labelText: string): boolean {
+    const lowerValue = value.toLowerCase();
+    const lowerLabel = labelText.toLowerCase();
+    const lowerTarget = targetAnswer.toLowerCase();
+    
+    // Direct matches
+    if (lowerValue === lowerTarget || lowerLabel === lowerTarget) {
+      return true;
+    }
+    
+    // Partial matches
+    if (lowerTarget === 'yes') {
+      return lowerValue.includes('yes') || lowerLabel.includes('yes') || 
+             lowerValue.includes('true') || lowerLabel.includes('true') ||
+             lowerValue === '1' || lowerLabel.includes('agree');
+    }
+    
+    if (lowerTarget === 'no') {
+      return lowerValue.includes('no') || lowerLabel.includes('no') || 
+             lowerValue.includes('false') || lowerLabel.includes('false') ||
+             lowerValue === '0' || lowerLabel.includes('disagree');
+    }
+    
+    return false;
+  }
+
+  private async handleConsentCheckboxes(page: Page, filledData: Record<string, any>): Promise<void> {
+    // Find and check consent checkboxes
+    const consentSelectors = [
+      'input[type="checkbox"][name*="consent" i]',
+      'input[type="checkbox"][name*="agree" i]',
+      'input[type="checkbox"][name*="accept" i]',
+      'input[type="checkbox"][name*="privacy" i]',
+      'input[type="checkbox"][name*="terms" i]',
+      'input[type="checkbox"][id*="consent" i]',
+      'input[type="checkbox"][id*="agree" i]',
+      'input[type="checkbox"][id*="accept" i]'
+    ];
+
+    for (const selector of consentSelectors) {
+      try {
+        const checkboxes = await page.locator(selector).all();
+        
+        for (const checkbox of checkboxes) {
+          if (await checkbox.isVisible({ timeout: 1000 }) && await checkbox.isEnabled()) {
+            const isRequired = await this.isFieldRequired(page, checkbox);
+            
+            if (isRequired) {
+              await checkbox.check();
+              console.log('✅ Checked required consent checkbox');
+              filledData.consentGiven = true;
+            }
+          }
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+
+  private async handleRelationshipQuestions(page: Page, filledData: Record<string, any>): Promise<void> {
+    // Handle "Do you have any personal or familial relationships" type questions
+    const relationshipIndicators = [
+      'personal or familial relationships',
+      'family members',
+      'relatives',
+      'friends or family',
+      'personal relationships'
+    ];
+
+    for (const indicator of relationshipIndicators) {
+      try {
+        // Find the question text and associated radio buttons
+        const questionElement = page.locator(`:has-text("${indicator}")`).first();
+        
+        if (await questionElement.isVisible({ timeout: 1000 })) {
+          // Look for "No" radio button near this question
+          const noRadio = questionElement.locator('..').locator('input[type="radio"][value*="no" i]').or(
+            questionElement.locator('..').locator('input[type="radio"]').filter({has: page.locator(':has-text("No")')})
+          ).first();
+          
+          if (await noRadio.isVisible({ timeout: 1000 }) && await noRadio.isEnabled()) {
+            await noRadio.check();
+            console.log('✅ Selected No for relationship question');
+            filledData.hasRelationships = 'No';
+            break;
+          }
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+
+  private async handleVisaSponsorshipQuestions(page: Page, profile: ComprehensiveProfile, filledData: Record<string, any>): Promise<void> {
+    const sponsorshipQuestions = [
+      'require sponsorship',
+      'need sponsorship',
+      'visa sponsorship',
+      'work permit',
+      'eligible to work'
+    ];
+
+    for (const question of sponsorshipQuestions) {
+      try {
+        const questionElement = page.locator(`:has-text("${question}")`).first();
+        
+        if (await questionElement.isVisible({ timeout: 1000 })) {
+          const answer = profile.requiresSponsorship ? 'Yes' : 'No';
+          
+          // Find appropriate radio button
+          const targetRadio = questionElement.locator('..').locator(`input[type="radio"]:has-text("${answer}")`).or(
+            questionElement.locator('..').locator(`input[type="radio"][value*="${answer.toLowerCase()}"]`)
+          ).first();
+          
+          if (await targetRadio.isVisible({ timeout: 1000 }) && await targetRadio.isEnabled()) {
+            await targetRadio.check();
+            console.log(`✅ Selected ${answer} for sponsorship question`);
+            filledData.sponsorshipRequired = answer;
+            break;
+          }
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+
+  private async isFieldRequired(page: Page, field: any): Promise<boolean> {
+    try {
+      // Check for required attribute
+      const required = await field.getAttribute('required');
+      if (required !== null) return true;
+
+      // Check for "required" in nearby text
+      const parent = field.locator('..');
+      const parentText = await parent.textContent() || '';
+      
+      return parentText.toLowerCase().includes('required') || 
+             parentText.includes('*') ||
+             parentText.toLowerCase().includes('mandatory');
+    } catch (e) {
+      return false;
     }
   }
 }
