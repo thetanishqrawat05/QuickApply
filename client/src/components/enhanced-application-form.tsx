@@ -29,7 +29,7 @@ export default function EnhancedApplicationForm({ jobUrl, onSuccess, onError }: 
   const totalSteps = 6;
   const progress = (step / totalSteps) * 100;
 
-  const updateProfile = (field: keyof ComprehensiveProfile, value: string | boolean | string[] | Record<string, string>) => {
+  const updateProfile = (field: keyof ComprehensiveProfile, value: string | boolean | string[] | Record<string, string> | null) => {
     setProfile(prev => ({ ...prev, [field]: value }));
   };
 
@@ -288,7 +288,7 @@ export default function EnhancedApplicationForm({ jobUrl, onSuccess, onError }: 
                   id="negotiable"
                   data-testid="checkbox-salary-negotiable"
                   checked={profile.salaryNegotiable || false}
-                  onCheckedChange={(checked) => updateProfile('salaryNegotiable', checked)}
+                  onCheckedChange={(checked) => updateProfile('salaryNegotiable', Boolean(checked))}
                 />
                 <Label htmlFor="negotiable">Salary is negotiable</Label>
               </div>

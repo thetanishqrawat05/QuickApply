@@ -296,7 +296,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
   // Submit application mutation
   const submitApplicationMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await fetch('/api/auto-apply', {
+      const response = await fetch('/api/interactive-apply/start', {
         method: 'POST',
         body: formData,
       });
@@ -310,9 +310,16 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
     },
     onSuccess: (result) => {
       toast({
-        title: "Application Started Successfully",
-        description: "Your job application is being processed. You'll receive email notifications with updates.",
+        title: "Interactive Session Started",
+        description: result.requiresLogin ? 
+          "Job page opened for manual login. Please complete login, then I'll fill the form automatically." :
+          "Ready to fill application form automatically.",
       });
+      
+      if (result.requiresLogin) {
+        // Open job page in new window for manual login
+        window.open(jobUrl, '_blank', 'width=1200,height=800');
+      }
       
       if (onSuccess && result.sessionId) {
         onSuccess(result.sessionId);
@@ -320,7 +327,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
     },
     onError: (error) => {
       toast({
-        title: "Application Failed",
+        title: "Session Start Failed",
         description: (error as Error).message,
         variant: "destructive"
       });
@@ -352,14 +359,18 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
 
       const formData = new FormData();
       formData.append('jobUrl', jobUrl);
-      formData.append('profile', JSON.stringify(data));
+      formData.append('profile', JSON.stringify({
+        ...data,
+        resumeFileName: resumeFile.name,
+        coverLetterFileName: coverLetterFile?.name || ''
+      }));
       
       if (resumeFile) {
-        formData.append('resume', resumeFile);
+        formData.append('resumeFile', resumeFile);
       }
       
       if (coverLetterFile) {
-        formData.append('coverLetter', coverLetterFile);
+        formData.append('coverLetterFile', coverLetterFile);
       }
 
       submitApplicationMutation.mutate(formData);
