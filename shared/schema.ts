@@ -198,9 +198,97 @@ export const users = pgTable('users', {
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   phone: varchar('phone', { length: 50 }).notNull(),
+  
+  // Personal Information
+  firstName: varchar('first_name', { length: 100 }),
+  lastName: varchar('last_name', { length: 100 }),
+  address: text('address'),
+  city: varchar('city', { length: 100 }),
+  state: varchar('state', { length: 50 }),
+  zipCode: varchar('zip_code', { length: 20 }),
+  country: varchar('country', { length: 50 }).default('United States'),
+  
+  // Professional Links
+  linkedinProfile: text('linkedin_profile'),
+  website: text('website'),
+  portfolioUrl: text('portfolio_url'),
+  
+  // Work Authorization
+  workAuthorization: varchar('work_authorization', { length: 30 }).default('us_citizen'),
+  requiresSponsorship: boolean('requires_sponsorship').default(false),
+  visaStatus: varchar('visa_status', { length: 50 }),
+  
+  // Salary & Availability
+  desiredSalary: varchar('desired_salary', { length: 50 }),
+  salaryMin: varchar('salary_min', { length: 50 }),
+  salaryMax: varchar('salary_max', { length: 50 }),
+  salaryNegotiable: boolean('salary_negotiable').default(true),
+  availableStartDate: varchar('available_start_date', { length: 50 }),
+  noticePeriod: varchar('notice_period', { length: 50 }),
+  
+  // Education
+  highestDegree: varchar('highest_degree', { length: 30 }),
+  university: varchar('university', { length: 200 }),
+  major: varchar('major', { length: 100 }),
+  graduationYear: varchar('graduation_year', { length: 10 }),
+  gpa: varchar('gpa', { length: 10 }),
+  
+  // Professional Experience
+  yearsOfExperience: varchar('years_of_experience', { length: 20 }),
+  currentTitle: varchar('current_title', { length: 100 }),
+  currentCompany: varchar('current_company', { length: 100 }),
+  previousTitle: varchar('previous_title', { length: 100 }),
+  previousCompany: varchar('previous_company', { length: 100 }),
+  
+  // Skills & Certifications (JSON arrays)
+  skills: json('skills').$type<string[]>(),
+  certifications: json('certifications').$type<string[]>(),
+  languages: json('languages').$type<string[]>(),
+  
+  // Background Check & Legal
+  criminalBackground: boolean('criminal_background'),
+  drugTest: boolean('drug_test'),
+  backgroundCheckConsent: boolean('background_check_consent').default(true),
+  
+  // Diversity & Inclusion
+  race: varchar('race', { length: 30 }),
+  gender: varchar('gender', { length: 20 }),
+  veteranStatus: varchar('veteran_status', { length: 30 }),
+  disabilityStatus: varchar('disability_status', { length: 20 }),
+  
+  // Employment Preferences
+  jobType: varchar('job_type', { length: 20 }),
+  workLocation: varchar('work_location', { length: 20 }),
+  willingToRelocate: boolean('willing_to_relocate'),
+  willingToTravel: boolean('willing_to_travel'),
+  
+  // References
+  hasReferences: boolean('has_references'),
+  referenceContactInfo: text('reference_contact_info'),
+  
+  // Custom Responses
+  whyInterested: text('why_interested'),
+  strengthsWeaknesses: text('strengths_weaknesses'),
+  careerGoals: text('career_goals'),
+  additionalInfo: text('additional_info'),
+  customResponses: json('custom_responses').$type<Record<string, string>>(),
+  
+  // Notification preferences
+  whatsappNumber: varchar('whatsapp_number', { length: 20 }),
+  enableWhatsappNotifications: boolean('enable_whatsapp_notifications').default(false),
+  enableEmailNotifications: boolean('enable_email_notifications').default(true),
+  
+  // AI & Automation preferences
+  enableAICoverLetter: boolean('enable_ai_cover_letter').default(true),
+  coverLetterTemplate: text('cover_letter_template'),
+  preferredLoginMethod: varchar('preferred_login_method', { length: 20 }).default('manual'),
+  
+  // Files
   resumeFileName: varchar('resume_file_name', { length: 255 }),
   coverLetterFileName: varchar('cover_letter_file_name', { length: 255 }),
+  
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const jobApplications = pgTable('job_applications', {
@@ -216,6 +304,7 @@ export const jobApplications = pgTable('job_applications', {
   retryCount: integer('retry_count').default(0).notNull(),
   submissionConfirmed: boolean('submission_confirmed').default(false).notNull(),
   applicationData: json('application_data'), // Store form data and metadata
+  profileSnapshot: json('profile_snapshot').$type<ComprehensiveProfile>(), // Store user profile at time of application
 });
 
 export const applicationSessions = pgTable('application_sessions', {

@@ -59,6 +59,10 @@ export interface IStorage {
   getTemporaryData(id: string): Promise<any>;
   setTemporaryData(id: string, data: any): Promise<void>;
   deleteTemporaryData(id: string): Promise<void>;
+  
+  // Profile management
+  updateUserProfile(email: string, profile: import("@shared/schema").ComprehensiveProfile): Promise<User | undefined>;
+  getUserProfile(email: string): Promise<import("@shared/schema").ComprehensiveProfile | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -250,6 +254,247 @@ export class DatabaseStorage implements IStorage {
 
   async deleteExpiredLoginSessions(): Promise<void> {
     await db.delete(loginSessions).where(lt(loginSessions.expiresAt, new Date()));
+  }
+
+  // Temporary data operations
+  private tempData: Map<string, any> = new Map();
+
+  async getTemporaryData(id: string): Promise<any> {
+    return this.tempData.get(id);
+  }
+
+  async setTemporaryData(id: string, data: any): Promise<void> {
+    this.tempData.set(id, data);
+  }
+
+  async deleteTemporaryData(id: string): Promise<void> {
+    this.tempData.delete(id);
+  }
+
+  // Profile management methods
+  async updateUserProfile(email: string, profile: import("@shared/schema").ComprehensiveProfile): Promise<User | undefined> {
+    try {
+      // Get or create user
+      let user = await this.getUserByEmail(email);
+      
+      if (!user) {
+        // Create new user with profile data
+        user = await this.createUser({
+          name: profile.name || `${profile.firstName} ${profile.lastName}`.trim(),
+          email: profile.email,
+          phone: profile.phone,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          address: profile.address,
+          city: profile.city,
+          state: profile.state,
+          zipCode: profile.zipCode,
+          country: profile.country,
+          linkedinProfile: profile.linkedinProfile,
+          website: profile.website,
+          portfolioUrl: profile.portfolioUrl,
+          workAuthorization: profile.workAuthorization,
+          requiresSponsorship: profile.requiresSponsorship,
+          visaStatus: profile.visaStatus,
+          desiredSalary: profile.desiredSalary,
+          salaryMin: profile.salaryMin,
+          salaryMax: profile.salaryMax,
+          salaryNegotiable: profile.salaryNegotiable,
+          availableStartDate: profile.availableStartDate,
+          noticePeriod: profile.noticePeriod,
+          highestDegree: profile.highestDegree,
+          university: profile.university,
+          major: profile.major,
+          graduationYear: profile.graduationYear,
+          gpa: profile.gpa,
+          yearsOfExperience: profile.yearsOfExperience,
+          currentTitle: profile.currentTitle,
+          currentCompany: profile.currentCompany,
+          previousTitle: profile.previousTitle,
+          previousCompany: profile.previousCompany,
+          skills: profile.skills,
+          certifications: profile.certifications,
+          languages: profile.languages,
+          criminalBackground: profile.criminalBackground,
+          drugTest: profile.drugTest,
+          backgroundCheckConsent: profile.backgroundCheckConsent,
+          race: profile.race,
+          gender: profile.gender,
+          veteranStatus: profile.veteranStatus,
+          disabilityStatus: profile.disabilityStatus,
+          jobType: profile.jobType,
+          workLocation: profile.workLocation,
+          willingToRelocate: profile.willingToRelocate,
+          willingToTravel: profile.willingToTravel,
+          hasReferences: profile.hasReferences,
+          referenceContactInfo: profile.referenceContactInfo,
+          whyInterested: profile.whyInterested,
+          strengthsWeaknesses: profile.strengthsWeaknesses,
+          careerGoals: profile.careerGoals,
+          additionalInfo: profile.additionalInfo,
+          customResponses: profile.customResponses,
+          whatsappNumber: profile.whatsappNumber,
+          enableWhatsappNotifications: profile.enableWhatsappNotifications,
+          enableEmailNotifications: profile.enableEmailNotifications,
+          enableAICoverLetter: profile.enableAICoverLetter,
+          coverLetterTemplate: profile.coverLetterTemplate,
+          preferredLoginMethod: profile.preferredLoginMethod,
+          resumeFileName: profile.resumeFileName,
+          coverLetterFileName: profile.coverLetterFileName,
+        });
+      } else {
+        // Update existing user with new profile data
+        const [updatedUser] = await db
+          .update(users)
+          .set({
+            name: profile.name || user.name,
+            phone: profile.phone || user.phone,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            address: profile.address,
+            city: profile.city,
+            state: profile.state,
+            zipCode: profile.zipCode,
+            country: profile.country,
+            linkedinProfile: profile.linkedinProfile,
+            website: profile.website,
+            portfolioUrl: profile.portfolioUrl,
+            workAuthorization: profile.workAuthorization,
+            requiresSponsorship: profile.requiresSponsorship,
+            visaStatus: profile.visaStatus,
+            desiredSalary: profile.desiredSalary,
+            salaryMin: profile.salaryMin,
+            salaryMax: profile.salaryMax,
+            salaryNegotiable: profile.salaryNegotiable,
+            availableStartDate: profile.availableStartDate,
+            noticePeriod: profile.noticePeriod,
+            highestDegree: profile.highestDegree,
+            university: profile.university,
+            major: profile.major,
+            graduationYear: profile.graduationYear,
+            gpa: profile.gpa,
+            yearsOfExperience: profile.yearsOfExperience,
+            currentTitle: profile.currentTitle,
+            currentCompany: profile.currentCompany,
+            previousTitle: profile.previousTitle,
+            previousCompany: profile.previousCompany,
+            skills: profile.skills,
+            certifications: profile.certifications,
+            languages: profile.languages,
+            criminalBackground: profile.criminalBackground,
+            drugTest: profile.drugTest,
+            backgroundCheckConsent: profile.backgroundCheckConsent,
+            race: profile.race,
+            gender: profile.gender,
+            veteranStatus: profile.veteranStatus,
+            disabilityStatus: profile.disabilityStatus,
+            jobType: profile.jobType,
+            workLocation: profile.workLocation,
+            willingToRelocate: profile.willingToRelocate,
+            willingToTravel: profile.willingToTravel,
+            hasReferences: profile.hasReferences,
+            referenceContactInfo: profile.referenceContactInfo,
+            whyInterested: profile.whyInterested,
+            strengthsWeaknesses: profile.strengthsWeaknesses,
+            careerGoals: profile.careerGoals,
+            additionalInfo: profile.additionalInfo,
+            customResponses: profile.customResponses,
+            whatsappNumber: profile.whatsappNumber,
+            enableWhatsappNotifications: profile.enableWhatsappNotifications,
+            enableEmailNotifications: profile.enableEmailNotifications,
+            enableAICoverLetter: profile.enableAICoverLetter,
+            coverLetterTemplate: profile.coverLetterTemplate,
+            preferredLoginMethod: profile.preferredLoginMethod,
+            resumeFileName: profile.resumeFileName,
+            coverLetterFileName: profile.coverLetterFileName,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, user.id))
+          .returning();
+        
+        user = updatedUser;
+      }
+      
+      return user;
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      return undefined;
+    }
+  }
+
+  async getUserProfile(email: string): Promise<import("@shared/schema").ComprehensiveProfile | undefined> {
+    try {
+      const user = await this.getUserByEmail(email);
+      if (!user) return undefined;
+      
+      // Convert user record to ComprehensiveProfile format
+      return {
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        address: user.address || '',
+        city: user.city || '',
+        state: user.state || '',
+        zipCode: user.zipCode || '',
+        country: user.country || 'United States',
+        linkedinProfile: user.linkedinProfile,
+        website: user.website,
+        portfolioUrl: user.portfolioUrl,
+        workAuthorization: user.workAuthorization as any || 'us_citizen',
+        requiresSponsorship: user.requiresSponsorship || false,
+        visaStatus: user.visaStatus,
+        desiredSalary: user.desiredSalary,
+        salaryMin: user.salaryMin,
+        salaryMax: user.salaryMax,
+        salaryNegotiable: user.salaryNegotiable || true,
+        availableStartDate: user.availableStartDate,
+        noticePeriod: user.noticePeriod,
+        highestDegree: user.highestDegree as any,
+        university: user.university,
+        major: user.major,
+        graduationYear: user.graduationYear,
+        gpa: user.gpa,
+        yearsOfExperience: user.yearsOfExperience,
+        currentTitle: user.currentTitle,
+        currentCompany: user.currentCompany,
+        previousTitle: user.previousTitle,
+        previousCompany: user.previousCompany,
+        skills: user.skills || [],
+        certifications: user.certifications || [],
+        languages: user.languages || [],
+        criminalBackground: user.criminalBackground,
+        drugTest: user.drugTest,
+        backgroundCheckConsent: user.backgroundCheckConsent || true,
+        race: user.race as any,
+        gender: user.gender as any,
+        veteranStatus: user.veteranStatus as any,
+        disabilityStatus: user.disabilityStatus as any,
+        jobType: user.jobType as any,
+        workLocation: user.workLocation as any,
+        willingToRelocate: user.willingToRelocate,
+        willingToTravel: user.willingToTravel,
+        hasReferences: user.hasReferences,
+        referenceContactInfo: user.referenceContactInfo,
+        whyInterested: user.whyInterested,
+        strengthsWeaknesses: user.strengthsWeaknesses,
+        careerGoals: user.careerGoals,
+        additionalInfo: user.additionalInfo,
+        customResponses: user.customResponses || {},
+        whatsappNumber: user.whatsappNumber,
+        enableWhatsappNotifications: user.enableWhatsappNotifications || false,
+        enableEmailNotifications: user.enableEmailNotifications || true,
+        enableAICoverLetter: user.enableAICoverLetter || true,
+        coverLetterTemplate: user.coverLetterTemplate,
+        preferredLoginMethod: user.preferredLoginMethod as any || 'manual',
+        resumeFileName: user.resumeFileName,
+        coverLetterFileName: user.coverLetterFileName
+      };
+    } catch (error) {
+      console.error('Error getting user profile:', error);
+      return undefined;
+    }
   }
 }
 

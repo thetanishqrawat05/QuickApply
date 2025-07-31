@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { comprehensiveProfileSchema } from '@shared/schema';
 import type { z } from 'zod';
 
@@ -30,7 +30,10 @@ import {
   User,
   MapPin,
   Phone,
-  Sparkles
+  Sparkles,
+  Save,
+  Database,
+  Loader2
 } from 'lucide-react';
 
 type ComprehensiveProfile = z.infer<typeof comprehensiveProfileSchema>;
@@ -43,7 +46,10 @@ interface ComprehensiveProfileFormProps {
 export function ComprehensiveProfileForm({ jobUrl, onSuccess }: ComprehensiveProfileFormProps) {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [coverLetterFile, setCoverLetterFile] = useState<File | null>(null);
+  const [savedProfileEmail, setSavedProfileEmail] = useState<string>('');
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const form = useForm<ComprehensiveProfile>({
     resolver: zodResolver(comprehensiveProfileSchema),
@@ -73,6 +79,91 @@ export function ComprehensiveProfileForm({ jobUrl, onSuccess }: ComprehensivePro
     },
     mode: 'onChange'
   });
+
+  // Mutation to save profile to database
+  const saveProfileMutation = useMutation({
+    mutationFn: async (profileData: ComprehensiveProfile) => {
+      const response = await fetch('/api/profile/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save profile');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Profile Saved",
+        description: "Your profile has been saved successfully and will be automatically loaded for future applications.",
+      });
+      setSavedProfileEmail(form.getValues('email'));
+      setProfileLoaded(true);
+    },
+    onError: (error) => {
+      toast({
+        title: "Save Failed",
+        description: (error as Error).message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Query to load profile from database
+  const { data: savedProfile, isLoading: isLoadingProfile } = useQuery({
+    queryKey: ['profile', savedProfileEmail],
+    queryFn: async () => {
+      if (!savedProfileEmail) return null;
+      const response = await fetch(`/api/profile/load/${encodeURIComponent(savedProfileEmail)}`);
+      if (!response.ok) {
+        if (response.status === 404) return null; // Profile not found is OK
+        throw new Error('Failed to load profile');
+      }
+      return response.json();
+    },
+    enabled: !!savedProfileEmail && !profileLoaded,
+  });
+
+  // Auto-save profile whenever form data changes (debounced)
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      if (value.email && value.firstName && value.lastName) {
+        // Auto-save after user fills basic info
+        const timeoutId = setTimeout(() => {
+          saveProfileMutation.mutate(value as ComprehensiveProfile);
+        }, 2000); // Debounce for 2 seconds
+
+        return () => clearTimeout(timeoutId);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, saveProfileMutation]);
+
+  // Load profile when email is entered and we find saved data
+  useEffect(() => {
+    const emailValue = form.watch('email');
+    if (emailValue && emailValue !== savedProfileEmail && !profileLoaded) {
+      setSavedProfileEmail(emailValue);
+    }
+  }, [form.watch('email'), savedProfileEmail, profileLoaded]);
+
+  // Auto-fill form when profile is loaded
+  useEffect(() => {
+    if (savedProfile && !profileLoaded) {
+      form.reset(savedProfile);
+      setProfileLoaded(true);
+      toast({
+        title: "Profile Loaded",
+        description: "Your saved profile has been automatically loaded!",
+      });
+    }
+  }, [savedProfile, form, profileLoaded, toast]);
 
   const applyMutation = useMutation({
     mutationFn: async (data: { jobUrl: string; profile: ComprehensiveProfile; resumeFile?: File; coverLetterFile?: File }) => {
@@ -118,7 +209,26 @@ export function ComprehensiveProfileForm({ jobUrl, onSuccess }: ComprehensivePro
     }
   });
 
+  // Manual save profile function
+  const handleSaveProfile = () => {
+    const currentData = form.getValues();
+    if (!currentData.email) {
+      toast({
+        title: "Email Required",
+        description: "Please enter your email address to save your profile.",
+        variant: "destructive"
+      });
+      return;
+    }
+    saveProfileMutation.mutate(currentData as ComprehensiveProfile);
+  };
+
   const onSubmit = (data: ComprehensiveProfile) => {
+    // Auto-save profile before submitting
+    if (data.email) {
+      saveProfileMutation.mutate(data);
+    }
+
     if (!resumeFile) {
       toast({
         title: "Resume Required",
@@ -159,13 +269,46 @@ export function ComprehensiveProfileForm({ jobUrl, onSuccess }: ComprehensivePro
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
-      <div className="text-center space-y-2">
+      <div className="text-center space-y-4">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
           Complete Your Profile
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Fill out all fields to ensure successful job applications across all platforms
+          Fill out all fields once and we'll save your profile for future applications
         </p>
+        
+        {/* Profile Status Indicator */}
+        <div className="flex items-center justify-center gap-4">
+          {profileLoaded && (
+            <div className="flex items-center gap-2 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-full text-sm">
+              <Database className="h-4 w-4" />
+              Profile Loaded
+            </div>
+          )}
+          
+          {isLoadingProfile && (
+            <div className="flex items-center gap-2 text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-full text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading Profile...
+            </div>
+          )}
+          
+          <Button 
+            type="button" 
+            variant="outline" 
+            size="sm"
+            onClick={handleSaveProfile}
+            disabled={saveProfileMutation.isPending || !form.watch('email')}
+            className="flex items-center gap-2"
+          >
+            {saveProfileMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Save Profile
+          </Button>
+        </div>
       </div>
 
       <Form {...form}>

@@ -1314,6 +1314,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Profile management endpoints
+  app.post("/api/profile/save", async (req, res) => {
+    try {
+      const profileData = req.body;
+      const userEmail = profileData.email;
+      
+      if (!userEmail) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      const user = await storage.updateUserProfile(userEmail, profileData);
+      
+      if (!user) {
+        return res.status(400).json({ error: 'Failed to save profile' });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: 'Profile saved successfully',
+        user: user
+      });
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      res.status(500).json({ error: 'Failed to save profile' });
+    }
+  });
+
+  // Load user profile by email
+  app.get("/api/profile/load/:email", async (req, res) => {
+    try {
+      const email = decodeURIComponent(req.params.email);
+      const profile = await storage.getUserProfile(email);
+      
+      if (!profile) {
+        return res.status(404).json({ error: 'Profile not found' });
+      }
+      
+      res.json(profile);
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      res.status(500).json({ error: 'Failed to load profile' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
