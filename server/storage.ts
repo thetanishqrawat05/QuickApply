@@ -425,6 +425,7 @@ export class DatabaseStorage implements IStorage {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        countryCode: user.countryCode || '+1',
         address: user.address || '',
         city: user.city || '',
         state: user.state || '',

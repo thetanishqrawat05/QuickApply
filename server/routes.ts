@@ -104,6 +104,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Profile save endpoint
+  app.post("/api/profile/save", async (req, res) => {
+    try {
+      const validationResult = comprehensiveProfileSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid profile data",
+          errors: validationResult.error.errors
+        });
+      }
+
+      const profileData = validationResult.data;
+      
+      // Check if user already exists
+      let user = await storage.getUserByEmail(profileData.email);
+      if (user) {
+        // Update existing user
+        user = await storage.updateUser(user.id, profileData);
+      } else {
+        // Create new user
+        user = await storage.createUser(profileData);
+      }
+      
+      res.json(user);
+    } catch (error) {
+      console.error("Profile save error:", error);
+      res.status(500).json({ 
+        message: "Failed to save profile",
+        errorDetails: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Profile load endpoint
+  app.get("/api/profile/load/:email", async (req, res) => {
+    try {
+      const email = decodeURIComponent(req.params.email);
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      console.error("Profile load error:", error);
+      res.status(500).json({ 
+        message: "Failed to load profile",
+        errorDetails: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // User management routes
   app.post("/api/users", async (req, res) => {
     try {
@@ -232,6 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: parsedProfile.name,
           email: parsedProfile.email,
           phone: parsedProfile.phone,
+          countryCode: parsedProfile.countryCode || '+1',
           resumeFileName: resumeFile.originalname,
           coverLetterFileName: coverLetterFile?.originalname,
         });

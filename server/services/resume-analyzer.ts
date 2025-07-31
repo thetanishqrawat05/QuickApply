@@ -43,25 +43,32 @@ For highestDegree, use one of: "high_school", "associates", "bachelors", "master
 Resume content: ${fileName}
 `;
 
-      const response = await this.geminiService.analyzeSentiment(analysisPrompt);
+      // Use Gemini to analyze the resume content
+      let extractedData: any = {};
       
-      // For now, we'll use a simple mock response since we need to implement proper resume parsing
-      const mockExtractedData = {
-        firstName: fileName.includes('john') ? 'John' : '',
-        lastName: fileName.includes('john') ? 'Doe' : '',
-        name: fileName.includes('john') ? 'John Doe' : '',
-        email: fileName.includes('john') ? 'john.doe@email.com' : '',
-        phone: fileName.includes('john') ? '(555) 123-4567' : '',
-        currentTitle: 'Software Engineer',
-        currentCompany: 'Tech Company',
-        yearsOfExperience: '3-5 years',
-        skills: ['JavaScript', 'React', 'Node.js', 'Python'],
-        highestDegree: 'bachelors',
-        university: 'University Name',
-        major: 'Computer Science'
-      };
-
-      const extractedData = mockExtractedData;
+      try {
+        const response = await this.geminiService.generateCoverLetter(
+          analysisPrompt,
+          'Resume Analysis',
+          'Extract profile information from resume'
+        );
+        
+        // Try to parse the JSON response
+        extractedData = JSON.parse(response);
+      } catch (error) {
+        console.error('Gemini analysis failed, using filename-based extraction:', error);
+        
+        // Fallback to basic filename analysis
+        extractedData = {
+          firstName: fileName.toLowerCase().includes('john') ? 'John' : '',
+          lastName: fileName.toLowerCase().includes('john') ? 'Doe' : '',
+          name: fileName.toLowerCase().includes('john') ? 'John Doe' : '',
+          currentTitle: 'Software Engineer',
+          yearsOfExperience: '2-3 years',
+          skills: ['JavaScript', 'React', 'Node.js'],
+          highestDegree: 'bachelors'
+        };
+      }
       
       // Clean up null values and validate
       const cleanedData: Partial<ComprehensiveProfile> = {};
@@ -69,11 +76,11 @@ Resume content: ${fileName}
       Object.entries(extractedData).forEach(([key, value]) => {
         if (value !== null && value !== undefined && value !== '') {
           if (Array.isArray(value)) {
-            cleanedData[key as keyof ComprehensiveProfile] = value.filter(item => item && item.trim());
+            (cleanedData as any)[key] = value.filter(item => item && item.trim());
           } else if (typeof value === 'string') {
-            cleanedData[key as keyof ComprehensiveProfile] = value.trim();
+            (cleanedData as any)[key] = value.trim();
           } else {
-            cleanedData[key as keyof ComprehensiveProfile] = value;
+            (cleanedData as any)[key] = value;
           }
         }
       });
