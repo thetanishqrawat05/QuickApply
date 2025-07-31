@@ -4,6 +4,7 @@ import { GeminiService } from './gemini-service';
 import { EnhancedAutoLoginService } from './enhanced-auto-login-service';
 import { EmailService } from './email-service';
 import { AIFormAnalyzer, FormAnalysis } from './ai-form-analyzer';
+import { UniversalFormDetector } from './universal-form-detector';
 import { ComprehensiveProfile } from '@shared/schema';
 import { storage } from '../storage';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,6 +23,7 @@ export class RealApplicationService {
   private geminiService: GeminiService;
   private autoLoginService: EnhancedAutoLoginService;
   private aiFormAnalyzer: AIFormAnalyzer;
+  private universalFormDetector: UniversalFormDetector;
   private emailService: EmailService;
 
   constructor() {
@@ -29,6 +31,7 @@ export class RealApplicationService {
     this.geminiService = new GeminiService();
     this.autoLoginService = new EnhancedAutoLoginService();
     this.aiFormAnalyzer = new AIFormAnalyzer();
+    this.universalFormDetector = new UniversalFormDetector();
     this.emailService = new EmailService();
   }
 
@@ -96,9 +99,7 @@ export class RealApplicationService {
       let aiCoverLetter = '';
       if (request.profile.enableAICoverLetter && !request.coverLetterFile) {
         try {
-          const experienceText = Array.isArray(request.profile.experience) 
-            ? request.profile.experience.map(exp => `${exp.title} at ${exp.company}`).join(', ')
-            : (request.profile.experience || 'Software engineering experience');
+          const experienceText = request.profile.yearsOfExperience || 'Software engineering experience';
             
           aiCoverLetter = await this.geminiService.generateCoverLetter(
             jobDetails.jobTitle,
@@ -1233,9 +1234,7 @@ This will send you an email with a secure login link when login is needed.
       'textarea[placeholder*="experience" i]', 'textarea[placeholder*="tell us about" i]'
     ];
 
-    const experienceText = Array.isArray(profile.experience) 
-      ? profile.experience.map(exp => `${exp.title} at ${exp.company}: ${exp.description || ''}`).join('\n\n')
-      : 'Experienced software engineer with full-stack development expertise';
+    const experienceText = profile.yearsOfExperience || 'Experienced software engineer with full-stack development expertise';
 
     await this.fillFieldWithSelectors(page, experienceSelectors, experienceText);
   }
@@ -1361,9 +1360,16 @@ This will send you an email with a secure login link when login is needed.
     }
   }
 
-  private async fillGeneralForm(page: Page, profile: ComprehensiveProfile): Promise<void> {
-    // Fallback general form filling for any unrecognized pages
-    await this.fillProfileStep(page, profile);
+  private async fillGeneralForm(page: Page, profile: ComprehensiveProfile): Promise<Record<string, any>> {
+    // Use the universal form detector for comprehensive field detection
+    const detectedFields = await this.universalFormDetector.detectAllFormFields(page);
+    console.log(`🔍 Detected ${detectedFields.length} form fields using universal detector`);
+    
+    // Fill detected fields with profile data
+    const filledData = await this.universalFormDetector.fillDetectedFields(page, detectedFields, profile);
+    
+    console.log(`✅ Universal form filling completed. Filled ${Object.keys(filledData).length} fields total.`);
+    return filledData;
   }
 
   private async analyzePageWithAI(page: Page): Promise<{
@@ -1450,9 +1456,7 @@ This will send you an email with a secure login link when login is needed.
       'textarea[placeholder*="experience" i]', 'textarea[placeholder*="work" i]'
     ];
 
-    const experienceText = Array.isArray(profile.experience) 
-      ? profile.experience.map(exp => `${exp.title} at ${exp.company}: ${exp.description}`).join('\n')
-      : 'Experienced software engineer with expertise in full-stack development';
+    const experienceText = profile.yearsOfExperience || 'Experienced software engineer with expertise in full-stack development';
 
     for (const selector of experienceSelectors) {
       try {
@@ -1665,7 +1669,7 @@ This will send you an email with a secure login link when login is needed.
             jobDetails.company,
             jobDetails.description,
             request.profile.name,
-            typeof request.profile.experience === 'string' ? request.profile.experience : JSON.stringify(request.profile.experience || [])
+            request.profile.yearsOfExperience || 'Software engineering experience'
           );
           console.log('🤖 AI cover letter generated for real mode simulation');
         } catch (error) {

@@ -1,14 +1,38 @@
 import { GoogleGenAI } from "@google/genai";
+import { GEMINI_CONFIG, validateGeminiConfig, getTaskConfig } from '../config/gemini-config';
 
 export class GeminiService {
   private ai: GoogleGenAI | null = null;
+  private isConfigured: boolean = false;
 
   constructor() {
-    if (process.env.GEMINI_API_KEY) {
-      this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      console.log('✅ Gemini AI service initialized');
-    } else {
-      console.warn('⚠️ Gemini API key not provided. AI features will be disabled.');
+    this.initializeGemini();
+  }
+
+  private initializeGemini() {
+    const validation = validateGeminiConfig();
+    
+    if (!validation.isValid) {
+      console.error('❌ Gemini configuration validation failed:', validation.errors);
+      this.isConfigured = false;
+      return;
+    }
+
+    try {
+      this.ai = new GoogleGenAI({
+        apiKey: GEMINI_CONFIG.apiKey
+      });
+      this.isConfigured = true;
+      console.log('✅ Gemini AI service initialized with permanent configuration');
+    } catch (error) {
+      console.error('❌ Failed to initialize Gemini:', error);
+      this.isConfigured = false;
+    }
+  }
+
+  private ensureConfigured() {
+    if (!this.isConfigured || !this.ai) {
+      throw new Error('Gemini service is not properly configured. Please check GEMINI_API_KEY environment variable.');
     }
   }
 
@@ -19,9 +43,9 @@ export class GeminiService {
     applicantName: string,
     applicantExperience: string
   ): Promise<string> {
-    if (!this.ai) {
-      throw new Error('Gemini API key not configured');
-    }
+    this.ensureConfigured();
+    
+    const config = getTaskConfig('coverLetterGeneration');
 
     const prompt = `
 Create a professional cover letter for this job application:
@@ -49,9 +73,14 @@ Generate the cover letter content:
 `;
 
     try {
-      const response = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
+      const response = await this.ai!.models.generateContent({
+        model: config.model,
         contents: prompt,
+        config: {
+          systemInstruction: config.systemInstruction,
+          temperature: config.temperature,
+          maxOutputTokens: config.maxOutputTokens
+        }
       });
 
       const coverLetter = response.text || 'Failed to generate cover letter';
@@ -70,9 +99,7 @@ Generate the cover letter content:
     requirements: string[];
     benefits: string[];
   }> {
-    if (!this.ai) {
-      throw new Error('Gemini API key not configured');
-    }
+    this.ensureConfigured();
 
     const prompt = `
 Analyze this job posting content and extract key information:
