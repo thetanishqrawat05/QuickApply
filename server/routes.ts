@@ -132,16 +132,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update existing user
         user = await storage.updateUser(user.id, profileData);
       } else {
-        // Create new user
-        user = await storage.createUser({
+        // Create new user with clean data structure
+        const userData = {
           name: `${profileData.firstName} ${profileData.lastName}`,
           email: profileData.email,
           phone: profileData.phone || '',
           countryCode: profileData.countryCode || '+1',
           firstName: profileData.firstName,
           lastName: profileData.lastName,
-          ...profileData
-        });
+          address: profileData.address || '',
+          city: profileData.city || '',
+          state: profileData.state || '',
+          zipCode: profileData.zipCode || '',
+          country: profileData.country || 'United States',
+          workAuthorization: profileData.workAuthorization || 'us_citizen',
+          requiresSponsorship: profileData.requiresSponsorship || false,
+          enableAICoverLetter: profileData.enableAICoverLetter || true,
+          enableEmailNotifications: profileData.enableEmailNotifications || true,
+          enableWhatsappNotifications: profileData.enableWhatsappNotifications || false,
+          skills: Array.isArray(profileData.skills) ? profileData.skills : [],
+          certifications: Array.isArray(profileData.certifications) ? profileData.certifications : [],
+          languages: Array.isArray(profileData.languages) ? profileData.languages : []
+        };
+        user = await storage.createUser(userData);
       }
       
       res.json(user);
@@ -303,6 +316,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: parsedProfile.email,
           phone: parsedProfile.phone,
           countryCode: parsedProfile.countryCode || '+1',
+          firstName: parsedProfile.firstName || '',
+          lastName: parsedProfile.lastName || '',
           resumeFileName: resumeFile.originalname,
           coverLetterFileName: coverLetterFile?.originalname,
         });

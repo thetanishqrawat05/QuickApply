@@ -101,12 +101,15 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       enableWhatsappNotifications: false,
       enableEmailNotifications: true,
       preferredLoginMethod: 'manual',
-      loginEmail: '',
-      loginPassword: '',
       whatsappNumber: '',
       resumeFileName: '',
       coverLetterFileName: '',
-      customResponses: {}
+      skills: [],
+      certifications: [],
+      languages: [],
+      customResponses: {},
+      salaryNegotiable: true,
+      backgroundCheckConsent: true
     },
     mode: 'onChange'
   });
