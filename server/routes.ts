@@ -10,6 +10,7 @@ import { EnhancedAutoApplyWorkflowService } from "./services/enhanced-auto-apply
 import { RealApplicationService } from "./services/real-application-service";
 import { ManualLoginAutomationService } from "./services/manual-login-automation";
 import { SecureLoginLinkService } from "./services/secure-login-link-service";
+import { ResumeAnalyzerService } from "./services/resume-analyzer";
 import { storage } from "./storage";
 
 const upload = multer({
@@ -36,6 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const realApplicationService = new RealApplicationService();
   const manualLoginAutomationService = new ManualLoginAutomationService();
   const secureLoginLinkService = new SecureLoginLinkService();
+  const resumeAnalyzerService = new ResumeAnalyzerService();
 
   // Serve uploaded screenshots
   const express = await import('express');
@@ -81,6 +83,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching screenshots:', error);
       res.status(500).json({ error: 'Failed to fetch screenshots' });
+    }
+  });
+
+  // Resume analysis endpoint
+  app.post("/api/analyze-resume", upload.single('resume'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "Resume file is required" });
+      }
+
+      const result = await resumeAnalyzerService.analyzeResumeFile(req.file.buffer, req.file.originalname);
+      res.json(result);
+    } catch (error) {
+      console.error("Resume analysis error:", error);
+      res.status(500).json({ 
+        message: "Failed to analyze resume",
+        errorDetails: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

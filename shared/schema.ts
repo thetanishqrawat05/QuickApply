@@ -19,6 +19,7 @@ export const comprehensiveProfileSchema = z.object({
   name: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email address"), 
   phone: z.string().min(1, "Phone number is required"),
+  countryCode: z.string().default("+1"),
   
   // Address & Location (Required for most applications)
   address: z.string().min(1, "Address is required"),
@@ -198,6 +199,7 @@ export const users = pgTable('users', {
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   phone: varchar('phone', { length: 50 }).notNull(),
+  countryCode: varchar('country_code', { length: 10 }).default('+1'),
   
   // Personal Information
   firstName: varchar('first_name', { length: 100 }),

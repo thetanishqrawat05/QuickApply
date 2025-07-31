@@ -476,7 +476,7 @@ This will send you an email with a secure login link when login is needed.
           'input[placeholder*="phone" i]', 'input[aria-label*="phone" i]',
           'input[name*="mobile"]', 'input[id*="mobile"]'
         ], 
-        value: profile.phone, 
+        value: `${profile.countryCode || '+1'} ${profile.phone}`, 
         key: 'phone' 
       },
       { 
@@ -510,6 +510,57 @@ This will send you an email with a secure login link when login is needed.
         ], 
         value: profile.zipCode || '', 
         key: 'zipCode' 
+      },
+      // Enhanced Professional Experience Fields
+      { 
+        selectors: [
+          'input[name*="title"]', 'input[id*="title"]', 'input[name*="position"]',
+          'input[placeholder*="job title" i]', 'input[aria-label*="current title" i]'
+        ], 
+        value: profile.currentTitle || '', 
+        key: 'currentTitle' 
+      },
+      { 
+        selectors: [
+          'input[name*="company"]', 'input[id*="company"]', 'input[name*="employer"]',
+          'input[placeholder*="company" i]', 'input[aria-label*="employer" i]'
+        ], 
+        value: profile.currentCompany || '', 
+        key: 'currentCompany' 
+      },
+      // Enhanced Education Fields
+      { 
+        selectors: [
+          'input[name*="university"]', 'input[id*="university"]', 'input[name*="school"]',
+          'input[placeholder*="university" i]', 'input[aria-label*="school" i]'
+        ], 
+        value: profile.university || '', 
+        key: 'university' 
+      },
+      { 
+        selectors: [
+          'input[name*="degree"]', 'input[id*="degree"]', 'select[name*="degree"]',
+          'input[placeholder*="degree" i]', 'input[aria-label*="education" i]'
+        ], 
+        value: profile.highestDegree || '', 
+        key: 'degree' 
+      },
+      { 
+        selectors: [
+          'input[name*="major"]', 'input[id*="major"]', 'input[name*="field"]',
+          'input[placeholder*="major" i]', 'input[aria-label*="field of study" i]'
+        ], 
+        value: profile.major || '', 
+        key: 'major' 
+      },
+      // Enhanced Work Authorization Fields
+      { 
+        selectors: [
+          'select[name*="work_authorization"]', 'select[id*="work_authorization"]',
+          'select[name*="visa"]', 'select[id*="visa"]', 'select[name*="eligible"]'
+        ], 
+        value: profile.workAuthorization || 'us_citizen', 
+        key: 'workAuthorization' 
       }
     ];
 
@@ -1671,6 +1722,42 @@ This will send you an email with a secure login link when login is needed.
         success: false,
         message: `Real mode simulation failed: ${(error as Error).message}`
       };
+    }
+  }
+
+  private async selectOptionInDropdown(field: any, value: string): Promise<void> {
+    try {
+      const tagName = await field.evaluate((el: Element) => el.tagName.toLowerCase());
+      
+      if (tagName === 'select') {
+        // Try different methods to select the option
+        const options = await field.locator('option').all();
+        for (const option of options) {
+          const optionText = await option.textContent() || '';
+          const optionValue = await option.getAttribute('value') || '';
+          
+          if (optionText.includes(value) || optionValue.includes(value) || 
+              value.includes(optionText) || value.includes(optionValue)) {
+            await field.selectOption({ label: optionText });
+            console.log(`✅ Selected dropdown option: ${optionText}`);
+            return;
+          }
+        }
+        
+        // Fallback: try to select by value directly
+        await field.selectOption({ value });
+      } else {
+        // For input fields, just fill with the value
+        await field.fill(value);
+      }
+    } catch (error) {
+      console.log(`Failed to select dropdown option: ${value}`);
+      // Try to fill as regular input as fallback
+      try {
+        await field.fill(value);
+      } catch (e) {
+        console.log(`Failed to fill field with value: ${value}`);
+      }
     }
   }
 }
