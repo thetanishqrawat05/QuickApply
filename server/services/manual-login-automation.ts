@@ -47,6 +47,32 @@ export class ManualLoginAutomationService {
     this.screenshotService = new ScreenshotService();
   }
 
+  private async clearOldSessions(userEmail: string): Promise<void> {
+    try {
+      // Clear any active sessions for this user
+      for (const [sessionId, session] of Array.from(this.activeSessions.entries())) {
+        const sessionData = await storage.getApplicationSession(sessionId);
+        if (sessionData?.profileData && 
+            typeof sessionData.profileData === 'object' && 
+            'email' in sessionData.profileData && 
+            sessionData.profileData.email === userEmail) {
+          
+          // Close browser context if it exists
+          try {
+            await session.browserContext.close();
+          } catch (error) {
+            console.log('Error closing browser context:', error);
+          }
+          
+          this.activeSessions.delete(sessionId);
+          console.log(`🧹 Cleared old session ${sessionId} for ${userEmail}`);
+        }
+      }
+    } catch (error) {
+      console.log('Error clearing old sessions:', error);
+    }
+  }
+
   async startJobApplication(request: ManualLoginApplicationRequest): Promise<{
     success: boolean;
     sessionId: string;
@@ -58,6 +84,9 @@ export class ManualLoginAutomationService {
 
     try {
       console.log(`🚀 Starting manual login job application for: ${request.jobUrl}`);
+      
+      // Clear any existing sessions for this user to prevent URL caching issues
+      await this.clearOldSessions(request.profile.email);
 
       // Create user record
       let user = await storage.getUserByEmail(request.profile.email);
@@ -71,11 +100,11 @@ export class ManualLoginAutomationService {
         });
       }
 
-      // Create application session in database
+      // Create application session in database with fresh URL
       await storage.createApplicationSession({
         id: sessionId,
         userId: user.id,
-        jobUrl: request.jobUrl,
+        jobUrl: request.jobUrl, // Ensure fresh job URL is used
         platform: this.detectPlatform(request.jobUrl),
         status: 'pending_login',
         profileData: request.profile,
@@ -94,7 +123,8 @@ export class ManualLoginAutomationService {
 
       const page = await context.newPage();
       
-      // Navigate to job page
+      // Navigate to the NEW job page URL (ensure fresh navigation)
+      console.log(`🌐 Navigating to fresh job URL: ${request.jobUrl}`);
       await page.goto(request.jobUrl, { waitUntil: 'networkidle' });
 
       // Extract job details
@@ -329,14 +359,18 @@ export class ManualLoginAutomationService {
 
     // Send email notification
     try {
-      await this.emailService.sendJobApplicationReview(
-        profile.email,
-        session.jobDetails.title,
-        session.jobDetails.company,
-        approvalUrl,
-        rejectUrl
-      );
-      console.log('📧 Review email sent');
+      // Get fresh session data from database to ensure correct job URL
+      const dbSession = await storage.getApplicationSession(sessionId);
+      if (dbSession) {
+        await this.emailService.sendJobApplicationReview(
+          profile.email,
+          session.jobDetails.title,
+          session.jobDetails.company,
+          approvalUrl,
+          rejectUrl
+        );
+        console.log('📧 Review email sent with fresh job URL');
+      }
     } catch (error) {
       console.log('Email send failed:', error);
     }
