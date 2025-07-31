@@ -113,7 +113,7 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
 
   // Auto-save profile on key field changes (without showing notifications)
   const autoSaveProfile = useMutation({
-    mutationFn: async (profileData: ComprehensiveProfile) => {
+    mutationFn: async (profileData: Partial<ComprehensiveProfile>) => {
       const response = await fetch('/api/profile/save', {
         method: 'POST',
         headers: {
@@ -123,7 +123,9 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
       });
       
       if (!response.ok) {
-        throw new Error('Failed to save profile');
+        const errorData = await response.json();
+        console.warn('Auto-save failed:', errorData);
+        return; // Silently fail for auto-save
       }
       
       return response.json();
@@ -253,20 +255,20 @@ export function EnhancedProfileForm({ jobUrl, onSuccess }: EnhancedProfileFormPr
     }
   }, [savedProfile, profileLoaded]);
 
-  // Auto-save on important field changes (silent)
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      const importantFields = ['email', 'firstName', 'lastName', 'phone', 'address', 'city', 'state'];
-      if (name && importantFields.includes(name) && value.email && value.firstName && value.lastName) {
-        // Debounce auto-save
-        const timer = setTimeout(() => {
-          autoSaveProfile.mutate(value as ComprehensiveProfile);
-        }, 2000);
-        return () => clearTimeout(timer);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form.watch]);
+  // Auto-save on important field changes (silent) - temporarily disabled
+  // useEffect(() => {
+  //   const subscription = form.watch((value, { name }) => {
+  //     const importantFields = ['email', 'firstName', 'lastName', 'phone', 'address', 'city', 'state'];
+  //     if (name && importantFields.includes(name) && value.email && value.firstName && value.lastName) {
+  //       // Debounce auto-save
+  //       const timer = setTimeout(() => {
+  //         autoSaveProfile.mutate(value as Partial<ComprehensiveProfile>);
+  //       }, 2000);
+  //       return () => clearTimeout(timer);
+  //     }
+  //   });
+  //   return () => subscription.unsubscribe();
+  // }, [form.watch]);
 
   const handleResumeUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

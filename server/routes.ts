@@ -107,7 +107,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Profile save endpoint
   app.post("/api/profile/save", async (req, res) => {
     try {
-      const validationResult = comprehensiveProfileSchema.safeParse(req.body);
+      // Use partial validation for profile saves to allow incomplete data
+      const partialProfileSchema = comprehensiveProfileSchema.partial();
+      const validationResult = partialProfileSchema.safeParse(req.body);
       if (!validationResult.success) {
         return res.status(400).json({ 
           message: "Invalid profile data",
@@ -117,14 +119,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const profileData = validationResult.data;
       
+      // Ensure required fields are present for creating a user
+      if (!profileData.email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
       // Check if user already exists
       let user = await storage.getUserByEmail(profileData.email);
       if (user) {
-        // Update existing user
-        user = await storage.updateUser(user.id, profileData);
+        // Update existing user with provided data
+        const updateData = { ...profileData };
+        user = await storage.updateUser(user.id, updateData);
       } else {
-        // Create new user
-        user = await storage.createUser(profileData);
+        // Create new user - ensure required fields are present
+        const createData = {
+          name: profileData.name || `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim() || 'New User',
+          email: profileData.email,
+          phone: profileData.phone || '',
+          countryCode: profileData.countryCode || '+1',
+          ...profileData
+        };
+        user = await storage.createUser(createData);
       }
       
       res.json(user);
