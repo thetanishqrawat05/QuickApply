@@ -37,6 +37,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const manualLoginAutomationService = new ManualLoginAutomationService();
   const secureLoginLinkService = new SecureLoginLinkService();
 
+  // Serve uploaded screenshots
+  const express = await import('express');
+  const path = await import('path');
+  app.use('/uploads', express.default.static(path.join(process.cwd(), 'uploads')));
+
+  // Endpoint to view screenshots for debugging
+  app.get('/api/screenshots/:sessionId', async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      const screenshotsDir = path.join(process.cwd(), 'uploads', 'screenshots');
+      
+      // Check if directory exists
+      if (!fs.existsSync(screenshotsDir)) {
+        return res.json({ sessionId, screenshots: [], total: 0 });
+      }
+      
+      const files = fs.readdirSync(screenshotsDir);
+      
+      // Find all screenshots for this session
+      const sessionScreenshots = files
+        .filter(file => file.includes(sessionId))
+        .sort((a, b) => {
+          // Sort by step number
+          const stepA = a.match(/step(\d+)/)?.[1] || '0';
+          const stepB = b.match(/step(\d+)/)?.[1] || '0';
+          return parseInt(stepA) - parseInt(stepB);
+        })
+        .map(file => ({
+          filename: file,
+          step: file.match(/step\d+-([^_]+)/)?.[1] || 'unknown',
+          url: `/uploads/screenshots/${file}`
+        }));
+
+      res.json({
+        sessionId,
+        screenshots: sessionScreenshots,
+        total: sessionScreenshots.length
+      });
+    } catch (error) {
+      console.error('Error fetching screenshots:', error);
+      res.status(500).json({ error: 'Failed to fetch screenshots' });
+    }
+  });
+
   // User management routes
   app.post("/api/users", async (req, res) => {
     try {

@@ -126,6 +126,14 @@ export class ManualLoginAutomationService {
       // Navigate to the NEW job page URL (ensure fresh navigation)
       console.log(`🌐 Navigating to fresh job URL: ${request.jobUrl}`);
       await page.goto(request.jobUrl, { waitUntil: 'networkidle' });
+      
+      // Take initial screenshot to show page loaded
+      try {
+        await this.screenshotService.captureScreenshot(page, sessionId, 'step1-page-loaded');
+        console.log('📸 Step 1: Page loaded screenshot captured');
+      } catch (error) {
+        console.log('Step 1 screenshot failed:', error);
+      }
 
       // Extract job details
       const jobDetails = await this.extractJobDetails(page);
@@ -151,6 +159,14 @@ export class ManualLoginAutomationService {
 
       if (requiresLogin) {
         console.log('🔐 Login detected - sending email for manual login');
+        
+        // Take screenshot showing login requirement
+        try {
+          await this.screenshotService.captureScreenshot(page, sessionId, 'step2-login-required');
+          console.log('📸 Step 2: Login requirement screenshot captured');
+        } catch (error) {
+          console.log('Step 2 screenshot failed:', error);
+        }
         
         // Send email notification for manual login with fresh job URL
         try {
@@ -239,6 +255,14 @@ export class ManualLoginAutomationService {
           currentSession.isLoggedIn = true;
           currentSession.loginVerified = true;
           
+          // Take screenshot after login success
+          try {
+            await this.screenshotService.captureScreenshot(currentSession.page, sessionId, 'step3-login-success');
+            console.log('📸 Step 3: Login success screenshot captured');
+          } catch (error) {
+            console.log('Step 3 screenshot failed:', error);
+          }
+          
           // Update session status
           await storage.updateApplicationSession(sessionId, {
             status: 'logged_in'
@@ -311,8 +335,24 @@ export class ManualLoginAutomationService {
         }
       }
 
+      // Take screenshot before form filling
+      try {
+        await this.screenshotService.captureScreenshot(session.page, sessionId, 'step4-before-form-fill');
+        console.log('📸 Step 4: Before form filling screenshot captured');
+      } catch (error) {
+        console.log('Step 4 screenshot failed:', error);
+      }
+
       // Fill the form with user data
       await this.fillApplicationForm(session.page, profile, aiCoverLetter);
+
+      // Take screenshot after form filling
+      try {
+        await this.screenshotService.captureScreenshot(session.page, sessionId, 'step5-form-filled');
+        console.log('📸 Step 5: Form filled screenshot captured');
+      } catch (error) {
+        console.log('Step 5 screenshot failed:', error);
+      }
 
       // Take screenshot before submission (continue even if screenshot fails)
       let screenshotPath = '';
@@ -320,10 +360,11 @@ export class ManualLoginAutomationService {
         screenshotPath = await this.screenshotService.captureScreenshot(
           session.page, 
           sessionId, 
-          'pre-submission'
+          'step6-pre-submission'
         );
+        console.log('📸 Step 6: Pre-submission screenshot captured');
       } catch (screenshotError) {
-        console.log('Screenshot failed, continuing with workflow:', screenshotError);
+        console.log('Step 6 screenshot failed, continuing with workflow:', screenshotError);
       }
 
       // Update session with filled data
@@ -391,14 +432,14 @@ export class ManualLoginAutomationService {
       }
     }
 
-    // Start 16-second timer for auto-submission
+    // Start 8-second timer for auto-submission
     setTimeout(async () => {
       const currentSession = await storage.getApplicationSession(sessionId);
       if (currentSession?.status === 'ready_for_submission') {
-        console.log('⏰ 16 seconds elapsed - auto-submitting application');
+        console.log('⏰ 8 seconds elapsed - auto-submitting application');
         await this.submitApplication(sessionId);
       }
-    }, 16000); // 16 seconds as requested
+    }, 8000); // 8 seconds for faster processing
   }
 
   async approveSubmission(sessionId: string): Promise<{ success: boolean; message: string }> {
@@ -456,20 +497,40 @@ export class ManualLoginAutomationService {
       // Find and click submit button
       const submitSuccess = await this.findAndClickSubmitButton(session.page);
 
+      // Take screenshot after clicking submit button
+      try {
+        await this.screenshotService.captureScreenshot(session.page, sessionId, 'step7-after-submit-click');
+        console.log('📸 Step 7: After submit click screenshot captured');
+      } catch (error) {
+        console.log('Step 7 screenshot failed:', error);
+      }
+
+      // Wait a moment for submission to process
+      await session.page.waitForTimeout(2000);
+
       // Take confirmation screenshot (continue even if screenshot fails)
       let confirmationScreenshot = '';
       try {
         confirmationScreenshot = await this.screenshotService.captureScreenshot(
           session.page,
           sessionId,
-          'confirmation'
+          'step8-final-confirmation'
         );
+        console.log('📸 Step 8: Final confirmation screenshot captured');
       } catch (screenshotError) {
-        console.log('Confirmation screenshot failed, continuing:', screenshotError);
+        console.log('Step 8 screenshot failed, continuing:', screenshotError);
       }
 
-      // Verify submission
+      // Verify submission with enhanced checking
       const submissionVerified = await this.verifySubmissionSuccess(session.page);
+      
+      // Take final screenshot to show submission result
+      try {
+        await this.screenshotService.captureScreenshot(session.page, sessionId, 'step9-submission-result');
+        console.log('📸 Step 9: Submission result screenshot captured');
+      } catch (error) {
+        console.log('Step 9 screenshot failed:', error);
+      }
 
       // Update session
       await storage.updateApplicationSession(sessionId, {
@@ -885,14 +946,25 @@ export class ManualLoginAutomationService {
     try {
       await page.waitForTimeout(3000);
 
+      // Enhanced success indicators
       const successIndicators = [
         'text="Thank you"',
         'text="Application submitted"',
         'text="Successfully submitted"',
         'text="Application received"',
+        'text="Thank you for applying"',
+        'text="Your application has been received"',
+        'text="Application complete"',
         '.success-message',
         '.confirmation',
-        '[data-testid="success"]'
+        '.success',
+        '.submitted',
+        '#success',
+        '#confirmation',
+        '[data-testid="success"]',
+        '[data-testid="confirmation"]',
+        '[class*="success"]',
+        '[class*="confirmation"]'
       ];
 
       for (const indicator of successIndicators) {
@@ -900,6 +972,8 @@ export class ManualLoginAutomationService {
         if (element) {
           const isVisible = await element.isVisible();
           if (isVisible) {
+            const elementText = await element.textContent();
+            console.log(`✅ Submission confirmed with indicator: ${indicator} - "${elementText}"`);
             return true;
           }
         }
@@ -907,10 +981,42 @@ export class ManualLoginAutomationService {
 
       // Check URL for success indicators
       const url = page.url().toLowerCase();
-      if (url.includes('success') || url.includes('thank') || url.includes('confirm')) {
+      if (url.includes('success') || url.includes('thank') || url.includes('confirm') || 
+          url.includes('submitted') || url.includes('complete') || url.includes('applied')) {
+        console.log(`✅ Submission confirmed by URL: ${url}`);
         return true;
       }
 
+      // Check page content for success messages
+      const pageContent = await page.textContent('body') || '';
+      const successMessages = [
+        'thank you for your application',
+        'application submitted successfully',
+        'your application has been received',
+        'application received',
+        'successfully submitted',
+        'thank you for applying',
+        'application complete'
+      ];
+
+      for (const message of successMessages) {
+        if (pageContent.toLowerCase().includes(message)) {
+          console.log(`✅ Submission confirmed with content: "${message}"`);
+          return true;
+        }
+      }
+
+      // Check if form disappeared after submission
+      const formsCount = await page.$$eval('form', forms => forms.length);
+      if (formsCount === 0) {
+        console.log('✅ Submission likely successful - application form disappeared');
+        return true;
+      }
+
+      console.log('⚠️ Could not verify submission success - manual verification recommended');
+      console.log(`Current URL: ${page.url()}`);
+      console.log(`Page content preview: ${pageContent.substring(0, 200)}...`);
+      
       return false;
     } catch (error) {
       console.log('Error verifying submission:', error);

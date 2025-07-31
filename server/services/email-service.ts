@@ -197,7 +197,7 @@ export class EmailService {
               <a href="${rejectUrl}" class="reject-btn">❌ Cancel Application</a>
               
               <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">
-                ⏰ Auto-submit in 16 seconds if no response
+                ⏰ Auto-submit in 8 seconds if no response
               </p>
             </div>
 
