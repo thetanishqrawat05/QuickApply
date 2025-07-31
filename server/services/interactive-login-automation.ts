@@ -74,9 +74,22 @@ export class InteractiveLoginAutomationService {
 
       const page = await context.newPage();
 
-      // Navigate to job page
+      // Navigate to job page with extended timeout and fallback strategy
       console.log(`📱 Navigating to: ${request.jobUrl}`);
-      await page.goto(request.jobUrl, { waitUntil: 'networkidle', timeout: 30000 });
+      try {
+        await page.goto(request.jobUrl, { 
+          waitUntil: 'networkidle',
+          timeout: 60000 
+        });
+      } catch (error) {
+        console.log('⚠️ Network idle timeout, trying with domcontentloaded...');
+        await page.goto(request.jobUrl, { 
+          waitUntil: 'domcontentloaded',
+          timeout: 30000 
+        });
+        // Wait an additional 5 seconds for dynamic content
+        await page.waitForTimeout(5000);
+      }
 
       // Take initial screenshot
       await this.screenshotService.captureScreenshot(page, sessionId, 'page-loaded');
